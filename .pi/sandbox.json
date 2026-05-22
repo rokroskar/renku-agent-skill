@@ -1,10 +1,20 @@
 {
   "filesystem": {
     "allowRead": [
-      "/Users/rok/.npm-global/lib/node_modules/@earendil-works/pi-coding-agent/docs/skills.md"
+      "/Users/rok/.npm-global/lib/node_modules/@earendil-works/pi-coding-agent/docs/skills.md",
+      "/Users/rok/.npm-global/lib/node_modules/@earendil-works/pi-coding-agent/docs/extensions.md",
+      "."
     ],
     "denyRead": [],
-    "allowWrite": [],
+    "allowWrite": [
+      "."
+    ],
     "denyWrite": []
+  },
+  "network": {
+    "allowedDomains": [
+      "renkulab.io"
+    ],
+    "deniedDomains": []
   }
 }
