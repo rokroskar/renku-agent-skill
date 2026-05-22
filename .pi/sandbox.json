@@ -1,0 +1,10 @@
+{
+  "filesystem": {
+    "allowRead": [
+      "/Users/rok/.npm-global/lib/node_modules/@earendil-works/pi-coding-agent/docs/skills.md"
+    ],
+    "denyRead": [],
+    "allowWrite": [],
+    "denyWrite": []
+  }
+}
