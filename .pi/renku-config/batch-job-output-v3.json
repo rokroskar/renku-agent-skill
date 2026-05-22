@@ -1,0 +1,22 @@
+{
+  "iframe_url": "https://dev.renku.ch/p/rokroskar/renku-demo-air-quality-analysis/sessions/show/rokroskar-e9d5c7d09604",
+  "image": "harbor.dev.renku.ch/renku-build/renku-build:renku-01ks81nvkqg6wzvtad27z39qt2",
+  "launcher_id": "01KS81NVJDCCNW793JV6465EEE",
+  "name": "rokroskar-e9d5c7d09604",
+  "project_id": "01KS81NK8RB0EC9BNW26BC7GR7",
+  "resource_class_id": 4,
+  "resources": {
+    "requests": {
+      "cpu": 0.5,
+      "memory": 1,
+      "storage": 1
+    }
+  },
+  "started": "2026-05-22T15:05:30Z",
+  "status": {
+    "ready_containers": 0,
+    "state": "starting",
+    "total_containers": 0
+  },
+  "url": "None"
+}

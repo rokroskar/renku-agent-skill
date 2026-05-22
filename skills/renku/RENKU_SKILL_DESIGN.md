@@ -33,13 +33,15 @@ python scripts/renku_agent.py api POST /projects --body payload.json
 
 ## Authentication
 
-Default authentication should use OAuth device-code flow.
+Default authentication should prefer the official Renku CLI login (`rnk login`) when `rnk` is available, with built-in OAuth device-code flow as fallback.
 
 Design decisions:
 
 - Default instance: `https://renkulab.io`
 - Test/staging instance: `https://dev.renku.ch`
-- OAuth client ID: `renku-cli`
+- Official CLI command: `rnk`
+- Preferred login path: `rnk --renku-url <base> login`
+- OAuth client ID for fallback/imported tokens: `renku-cli`
 - Client type: public client, no client secret
 - Endpoint discovery: helper should discover the relevant OIDC/Keycloak/device endpoints automatically where possible
 - Credential storage: user-level config file
@@ -51,12 +53,15 @@ Design decisions:
 - Credential file permissions should be restricted, e.g. `0600`.
 - Multiple instances/accounts should be supported, keyed by base URL.
 - `RENKU_BASE_URL` should override the base URL.
-- `RENKU_ACCESS_TOKEN` and/or `RENKU_TOKEN` should be supported as environment-token fallback for automation.
+- `RENKU_ACCESS_TOKEN`, `RENKU_TOKEN`, and `RENKU_CLI_ACCESS_TOKEN` should be supported as environment-token fallback for automation.
+- The helper should read/import valid `rnk` tokens for direct API calls where possible.
 
 Planned auth commands:
 
 ```bash
-python scripts/renku_agent.py auth login
+python scripts/renku_agent.py auth login                  # auto: prefer rnk, fallback to device
+python scripts/renku_agent.py auth login --method rnk     # require rnk
+python scripts/renku_agent.py auth login --method device  # built-in fallback
 python scripts/renku_agent.py auth status
 python scripts/renku_agent.py auth logout
 ```

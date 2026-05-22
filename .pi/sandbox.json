@@ -3,11 +3,14 @@
     "allowRead": [
       "/Users/rok/.npm-global/lib/node_modules/@earendil-works/pi-coding-agent/docs/skills.md",
       "/Users/rok/.npm-global/lib/node_modules/@earendil-works/pi-coding-agent/docs/extensions.md",
-      "."
+      ".",
+      "/Users/rok/Library/Application Support/io.renku.sdsc.renku-cli/token.json",
+      "/Users/rok/.npm-global/lib/node_modules/@earendil-works/pi-coding-agent/docs/packages.md"
     ],
     "denyRead": [],
     "allowWrite": [
-      "."
+      ".",
+      "/tmp/patch-out.json"
     ],
     "denyWrite": []
   },

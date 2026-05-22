@@ -1,0 +1,205 @@
+# Renku Skill Workflows
+
+## Principle
+
+Admin safety lockout: if the current Renku user has `is_admin: true`, do not perform any Renku operation on any Renku instance. Only `auth logout` is allowed. Ask the user to log back in with a non-admin account.
+
+Use workflow commands first; fall back to `api` when the Renku API has changed or a P0 command is missing.
+
+Run commands from the skill directory:
+
+```bash
+python3 scripts/renku_agent.py <command>
+```
+
+Global flags may be placed before or after subcommands:
+
+```bash
+--json      machine-readable output
+--quiet     print only the key id/url where useful
+--dry-run   show intended request without sending writes
+--yes       skip confirmation only after user approved
+```
+
+## Project with repository
+
+```bash
+python3 scripts/renku_agent.py project create \
+  --name "Example" \
+  --namespace <namespace> \
+  --visibility private \
+  --repository https://github.com/org/repo.git
+```
+
+Repositories are strings in the project's `repositories` array. Add/remove by fetching project, changing the list, and PATCHing it.
+
+## Data connector then link to project
+
+```bash
+python3 scripts/renku_agent.py connector create doi --name "Dataset" --doi "10.xxxx/..." --target-path /data --global
+python3 scripts/renku_agent.py connector link --connector <connector-id> --project <project-id>
+```
+
+For S3/Polybox/SWITCHdrive the helper prompts for secrets and redacts them from output. Data connector `target_path` values are relative to the session working directory, so use `zurich-air-quality-data` rather than `/zurich-air-quality-data`.
+
+## Session launcher types
+
+Renku session launchers can use different environment sources.
+
+### Existing/global environment
+
+Use this when the user wants a prebuilt image/environment.
+
+```json
+{
+  "project_id": "01...",
+  "name": "JupyterLab",
+  "environment": { "id": "01..." },
+  "resource_class_id": 1
+}
+```
+
+### Build from code
+
+Use this when a linked Git repository contains dependency files or build hints. For Python notebook repos containing `requirements.txt`, `environment.yml`, `pyproject.toml`, or similar, offer to create a build-from-code launcher with JupyterLab.
+
+```json
+{
+  "project_id": "01...",
+  "name": "JupyterLab from repository",
+  "description": "Builds a JupyterLab environment from the linked repository.",
+  "environment": {
+    "environment_image_source": "build",
+    "repository": "https://github.com/org/repo.git",
+    "builder_variant": "python",
+    "frontend_variant": "jupyterlab",
+    "repository_revision": "main",
+    "context_dir": ".",
+    "platforms": ["linux/amd64"]
+  }
+}
+```
+
+Then:
+
+```bash
+python3 scripts/renku_agent.py launcher create --body launcher.json
+```
+
+For R projects, use `builder_variant: "r"` and `frontend_variant: "rstudio"` when available. Other Python frontends may include `vscodium` and `ttyd`.
+
+## Recommended repo-to-Renku workflow
+
+When the user provides a GitHub/GitLab repo and asks to base a Renku project on it:
+
+1. Inspect the repository structure.
+2. If Python dependency files are present, recommend build-from-code with `builder_variant=python` and `frontend_variant=jupyterlab`.
+3. Create the project with the repo URL in `repositories`.
+4. Create a build-from-code session launcher for that repo.
+5. Optionally trigger a build or launch a session.
+
+## Non-interactive job
+
+```bash
+python3 scripts/renku_agent.py job run --launcher <launcher-id>
+python3 scripts/renku_agent.py job list
+python3 scripts/renku_agent.py job wait <job-session-id>
+python3 scripts/renku_agent.py session logs <session-id>
+```
+
+This wraps `POST /sessions` with `session_type: non-interactive`.
+
+Use `job wait` rather than writing custom polling loops. It polls status, prints concise log tails, and exits when the job reaches a terminal state:
+
+```bash
+python3 scripts/renku_agent.py job wait <job-session-id> --timeout 1800 --interval 10
+```
+
+Before rerunning a job, remove the previous failed/stopped job session from the same launcher/project. Renku may reuse or conflict with an existing failed job session name. If the user asks to rerun a failed job, it is acceptable to delete the failed job session first, while clearly stating which session is being removed.
+
+## Convert a build-from-code launcher into a job launcher
+
+A build-from-code launcher has an environment like:
+
+```json
+{
+  "environment_image_source": "build",
+  "build_parameters": {
+    "repository": "https://github.com/org/repo",
+    "builder_variant": "python",
+    "frontend_variant": "jupyterlab"
+  },
+  "container_image": "harbor.../renku-build:..."
+}
+```
+
+After the build succeeds, the launcher can be converted to an external-image job launcher by PATCHing the launcher environment:
+
+1. Get the launcher and confirm the build succeeded.
+2. Use the built `environment.container_image` as the fixed image.
+3. Set `environment_image_source` to `image`.
+4. Keep `environment_kind` as `CUSTOM`.
+5. Set `command` to `["/cnb/lifecycle/launcher"]` so the CNB launch environment is initialized correctly.
+6. Set `args` to the command to run inside the image.
+7. Run with `job run --launcher <launcher-id>` (`session_type: non-interactive`).
+
+For notebook batch execution, prefer a Python `-c` script over complex shell quoting. Example launcher patch:
+
+```json
+{
+  "name": "Run notebooks batch",
+  "description": "Non-interactive launcher that executes notebooks and writes rendered notebooks to output-data.",
+  "environment": {
+    "name": "Run notebooks batch",
+    "environment_image_source": "image",
+    "environment_kind": "CUSTOM",
+    "container_image": "<successful-build-image>",
+    "default_url": "/",
+    "working_directory": "/home/renku/work",
+    "mount_directory": "/home/renku/work",
+    "port": 8888,
+    "command": ["/cnb/lifecycle/launcher"],
+    "args": [
+      "python",
+      "-c",
+      "import pathlib, subprocess; root=pathlib.Path('/home/renku/work'); repo=root/'<repo-dir>'; outroot=root/'output-data'/'executed-notebooks'; nbs=[p for p in repo.rglob('*.ipynb') if '.ipynb_checkpoints' not in p.parts]; print('Notebooks:', [str(p.relative_to(repo)) for p in nbs], flush=True); assert nbs, 'No notebooks found'; [(lambda nb, rel: ((outroot/rel.parent).mkdir(parents=True, exist_ok=True), print(f'Executing {nb} -> {outroot/rel}', flush=True), subprocess.run(['jupyter','nbconvert','--to','notebook','--execute',str(nb),'--output-dir',str(outroot/rel.parent),'--output',rel.name,'--ExecutePreprocessor.timeout=1200'], check=True)))(nb, nb.relative_to(repo)) for nb in nbs]"
+    ]
+  }
+}
+```
+
+Then:
+
+```bash
+python3 scripts/renku_agent.py launcher patch <launcher-id> --body job-launcher-patch.json
+python3 scripts/renku_agent.py session delete <old-failed-job-session> --yes   # if rerunning a failed/stopped job
+python3 scripts/renku_agent.py job run --launcher <launcher-id>
+python3 scripts/renku_agent.py job wait <job-session-name> --timeout 1800 --interval 10
+```
+
+Notes:
+
+- Do not use the raw API session URL for jobs; jobs usually return `url: None`.
+- If writing outputs to a data connector, ensure the connector is linked to the project, writable, and has a relative `target_path` such as `output-data`.
+- The job session name may be reused for the same launcher, so remove failed/stopped job sessions before rerunning.
+- If the original interactive launcher should be preserved, create a separate launcher for the job instead of patching the interactive launcher in place.
+
+## Session URLs
+
+The sessions API returns a raw session URL like:
+
+```text
+<base>/sessions/<session-name>/lab/
+```
+
+For users, prefer the Renku project iframe URL when namespace and project slug are known:
+
+```text
+<base>/p/<namespace>/<project-slug>/sessions/show/<session-name>
+```
+
+Example:
+
+```text
+https://dev.renku.ch/p/rokroskar/renku-demo-air-quality-analysis/sessions/show/rokroskar-e9d5c7d09604
+```

@@ -1,0 +1,12 @@
+{
+  "name": "Run notebooks batch",
+  "description": "Non-interactive launcher that executes notebooks and writes rendered notebooks to the output-data connector.",
+  "environment": {
+    "command": ["/cnb/lifecycle/launcher"],
+    "args": [
+      "bash",
+      "-lc",
+      "set -euxo pipefail; cd /home/renku/work; mkdir -p output-data/executed-notebooks; echo 'Searching for notebooks...'; find renku-demo-air-quality-analysis -path '*/.ipynb_checkpoints/*' -prune -o -name '*.ipynb' -print; while IFS= read -r -d '' nb; do out=\"output-data/executed-notebooks/${nb#renku-demo-air-quality-analysis/}\"; mkdir -p \"$(dirname \"$out\")\"; echo \"Executing $nb -> $out\"; jupyter nbconvert --to notebook --execute \"$nb\" --output \"/home/renku/work/$out\" --ExecutePreprocessor.timeout=1200; done < <(find renku-demo-air-quality-analysis -path '*/.ipynb_checkpoints/*' -prune -o -name '*.ipynb' -print0)"
+    ]
+  }
+}

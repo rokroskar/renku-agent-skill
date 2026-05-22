@@ -1,0 +1,10 @@
+{
+  "environment": {
+    "command": ["/cnb/lifecycle/launcher"],
+    "args": [
+      "python",
+      "-c",
+      "import pathlib, subprocess; root=pathlib.Path('/home/renku/work'); repo=root/'renku-demo-air-quality-analysis'; outroot=root/'output-data'/'executed-notebooks'; nbs=[p for p in repo.rglob('*.ipynb') if '.ipynb_checkpoints' not in p.parts]; print('Notebooks:', [str(p.relative_to(repo)) for p in nbs], flush=True); assert nbs, 'No notebooks found';\nfor nb in nbs:\n    rel=nb.relative_to(repo); outdir=outroot/rel.parent; outdir.mkdir(parents=True, exist_ok=True); print(f'Executing {nb} -> {outdir/rel.name}', flush=True); subprocess.run(['jupyter','nbconvert','--to','notebook','--execute',str(nb),'--output-dir',str(outdir),'--output',rel.name,'--ExecutePreprocessor.timeout=1200], check=True)"
+    ]
+  }
+}

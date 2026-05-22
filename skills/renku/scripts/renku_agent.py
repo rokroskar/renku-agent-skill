@@ -25,8 +25,39 @@ from typing import Any, Optional
 
 DEFAULT_BASE_URL = "https://renkulab.io"
 CLIENT_ID = "renku-cli"
-CONFIG_DIR = Path(os.environ.get("RENKU_SKILL_CONFIG_DIR", Path.home() / ".config" / "pi-renku-skill"))
+def find_project_root(start: Optional[Path] = None) -> Optional[Path]:
+    cur = (start or Path.cwd()).resolve()
+    for p in [cur, *cur.parents]:
+        if (p / ".pi").is_dir():
+            return p
+        parts = p.parts
+        if ".pi" in parts:
+            idx = parts.index(".pi")
+            if idx > 0:
+                return Path(*parts[:idx])
+    return None
+
+
+def choose_config_dir() -> Path:
+    if os.environ.get("RENKU_SKILL_CONFIG_DIR"):
+        return Path(os.environ["RENKU_SKILL_CONFIG_DIR"]).expanduser()
+    preferred = Path.home() / ".config" / "pi-renku-skill"
+    try:
+        preferred.mkdir(parents=True, exist_ok=True)
+        probe = preferred / ".write-test"
+        probe.write_text("")
+        probe.unlink(missing_ok=True)
+        return preferred
+    except Exception:
+        root = find_project_root()
+        if root:
+            return root / ".pi" / "renku-config"
+        return Path.cwd() / ".renku-config"
+
+
+CONFIG_DIR = choose_config_dir()
 CREDS_FILE = CONFIG_DIR / "credentials.json"
+STATE_DIR = CONFIG_DIR / "state"
 REDACT_KEYS = {"access_token", "refresh_token", "id_token", "token", "password", "secret", "client_secret"}
 
 
@@ -42,11 +73,18 @@ def api_base(base: Optional[str] = None) -> str:
     return (base or base_url()).rstrip("/") + "/api/data"
 
 
+def sensitive_key(key: str) -> bool:
+    k = key.lower()
+    if k in {"env_token", "token_type", "expires_in", "refresh_expires_in"}:
+        return False
+    return k in REDACT_KEYS or k.endswith("_token") or k.endswith("_secret") or "password" in k
+
+
 def redact(obj: Any) -> Any:
     if isinstance(obj, dict):
         out = {}
         for k, v in obj.items():
-            if any(s in k.lower() for s in REDACT_KEYS):
+            if sensitive_key(k):
                 out[k] = "<redacted>"
             else:
                 out[k] = redact(v)
@@ -119,7 +157,47 @@ def form_post(url: str, data: dict[str, Any]) -> dict[str, Any]:
 
 
 def token_from_env() -> Optional[str]:
-    return os.environ.get("RENKU_ACCESS_TOKEN") or os.environ.get("RENKU_TOKEN")
+    return os.environ.get("RENKU_ACCESS_TOKEN") or os.environ.get("RENKU_TOKEN") or os.environ.get("RENKU_CLI_ACCESS_TOKEN")
+
+
+def rnk_token_paths() -> list[Path]:
+    paths: list[Path] = []
+    if sys.platform == "darwin":
+        paths.append(Path.home() / "Library" / "Application Support" / "io.renku.sdsc.renku-cli" / "token.json")
+    xdg = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
+    paths.append(xdg / "io.renku.sdsc.renku-cli" / "token.json")
+    if os.environ.get("APPDATA"):
+        paths.append(Path(os.environ["APPDATA"]) / "io.renku.sdsc.renku-cli" / "token.json")
+    return paths
+
+
+def load_rnk_token(base: Optional[str] = None) -> Optional[dict[str, Any]]:
+    expected_issuer = (base or base_url()).rstrip("/") + "/auth/realms/Renku"
+    for path in rnk_token_paths():
+        if not path.exists():
+            continue
+        try:
+            data = json.loads(path.read_text())
+            response = data.get("response") or data
+            access = response.get("access_token")
+            if not access:
+                continue
+            # Do a lightweight issuer check by decoding the JWT payload without verification.
+            try:
+                import base64
+                payload_part = access.split(".")[1]
+                payload_part += "=" * (-len(payload_part) % 4)
+                payload = json.loads(base64.urlsafe_b64decode(payload_part.encode()))
+                if payload.get("iss") != expected_issuer:
+                    continue
+                if payload.get("exp") and time.time() > int(payload["exp"]) - 60:
+                    continue
+            except Exception:
+                pass
+            return {"tokens": response, "path": str(path)}
+        except Exception:
+            continue
+    return None
 
 
 def get_instance_creds(base: Optional[str] = None) -> Optional[dict[str, Any]]:
@@ -141,6 +219,9 @@ def auth_header(base: Optional[str] = None) -> dict[str, str]:
     env = token_from_env()
     if env:
         return {"Authorization": f"Bearer {env}"}
+    rnk_tok = load_rnk_token(base)
+    if rnk_tok:
+        return {"Authorization": f"Bearer {rnk_tok['tokens']['access_token']}"}
     inst = get_instance_creds(base)
     if not inst:
         raise RenkuError("Not authenticated. Run: python scripts/renku_agent.py auth login")
@@ -169,7 +250,25 @@ def auth_header(base: Optional[str] = None) -> dict[str, str]:
     return {"Authorization": f"Bearer {access}"}
 
 
-def http_json(method: str, path_or_url: str, body: Any = None, auth: bool = True, absolute: bool = False, query: Optional[dict[str, Any]] = None) -> Any:
+def admin_check_enabled() -> bool:
+    return os.environ.get("RENKU_ALLOW_ADMIN", "").lower() not in {"1", "true", "yes"}
+
+
+def assert_not_admin() -> None:
+    if not admin_check_enabled():
+        return
+    try:
+        user = http_json("GET", "/user", auth=True, skip_admin_check=True)
+        if isinstance(user, dict) and user.get("is_admin") is True:
+            raise RenkuError("Refusing to operate on Renku while authenticated as an admin user. Run auth logout and log in with a non-admin account.")
+    except RenkuError:
+        raise
+    except Exception:
+        # If user status cannot be determined, continue and let the original request surface auth/API errors.
+        return
+
+
+def http_json(method: str, path_or_url: str, body: Any = None, auth: bool = True, absolute: bool = False, query: Optional[dict[str, Any]] = None, skip_admin_check: bool = False) -> Any:
     if absolute or path_or_url.startswith("http"):
         url = path_or_url
     else:
@@ -184,6 +283,8 @@ def http_json(method: str, path_or_url: str, body: Any = None, auth: bool = True
         data = json.dumps(body).encode()
         headers["Content-Type"] = "application/json"
     if auth:
+        if not skip_admin_check and not (method.upper() == "GET" and path_or_url == "/user"):
+            assert_not_admin()
         headers.update(auth_header())
     req = urllib.request.Request(url, data=data, method=method.upper(), headers=headers)
     try:
@@ -232,29 +333,89 @@ def try_rnk() -> Optional[str]:
     return None
 
 
-def cmd_auth_login(args: argparse.Namespace) -> None:
-    b = base_url()
-    oidc = discover_oidc(b)
+def auth_state_path(base: str) -> Path:
+    safe = base.replace("https://", "").replace("http://", "").replace("/", "_")
+    return STATE_DIR / f"device-{safe}.json"
+
+
+def start_device_login(args: argparse.Namespace, b: str, oidc: dict[str, Any]) -> dict[str, Any]:
     device_ep = oidc.get("device_authorization_endpoint")
     if not device_ep:
         raise RenkuError("OIDC configuration does not include device_authorization_endpoint")
     init = form_post(device_ep, {"client_id": CLIENT_ID, "scope": args.scope})
+    state = {"base_url": b, "oidc": oidc, "device": init, "created_at": int(time.time())}
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    path = auth_state_path(b)
+    path.write_text(json.dumps(state, indent=2, sort_keys=True))
+    try:
+        os.chmod(path, stat.S_IRUSR | stat.S_IWUSR)
+    except Exception:
+        pass
+    return state
+
+
+def finish_device_login(state: dict[str, Any]) -> bool:
+    b = state["base_url"]
+    oidc = state["oidc"]
+    init = state["device"]
+    tok = form_post(oidc["token_endpoint"], {
+        "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+        "client_id": CLIENT_ID,
+        "device_code": init["device_code"],
+    })
+    set_instance_creds(b, tok, oidc)
+    try:
+        auth_state_path(b).unlink(missing_ok=True)
+    except Exception:
+        pass
+    print(f"Authenticated to {b}; credentials saved in {CREDS_FILE}")
+    return True
+
+
+def print_device_instructions(state: dict[str, Any]) -> None:
+    init = state["device"]
+    path = auth_state_path(state["base_url"])
     print("Open this URL and enter the code to authorize Renku access:")
     print(init.get("verification_uri_complete") or init.get("verification_uri"))
     if init.get("user_code"):
         print(f"Code: {init['user_code']}")
-    interval = int(init.get("interval", 5))
-    deadline = time.time() + int(init.get("expires_in", 600))
+    print(f"Then run: python3 scripts/renku_agent.py auth complete --state {path}")
+
+
+def cmd_auth_login(args: argparse.Namespace) -> None:
+    b = base_url()
+    if args.method in ("auto", "rnk") and not args.no_rnk:
+        exe = try_rnk()
+        if exe:
+            cmd = [exe, "--renku-url", b, "login"]
+            print(f"Using official Renku CLI for login: {' '.join(cmd)}")
+            rc = subprocess.call(cmd)
+            if rc == 0:
+                rnk_tok = load_rnk_token(b)
+                if rnk_tok:
+                    try:
+                        set_instance_creds(b, rnk_tok["tokens"], discover_oidc(b))
+                        print(f"Imported rnk credentials from {rnk_tok['path']} for direct API use.")
+                    except Exception as e:
+                        print(f"Warning: rnk login succeeded but importing credentials failed: {e}", file=sys.stderr)
+                print(f"Authenticated to {b} with rnk")
+                return
+            if args.method == "rnk":
+                raise RenkuError(f"rnk login failed with exit code {rc}")
+            print("rnk login failed; falling back to built-in device flow", file=sys.stderr)
+        elif args.method == "rnk":
+            raise RenkuError("rnk was not found on PATH or in the skill cache")
+    oidc = discover_oidc(b)
+    state = start_device_login(args, b, oidc)
+    print_device_instructions(state)
+    if args.user_code_only:
+        return
+    interval = int(state["device"].get("interval", 5))
+    deadline = time.time() + int(state["device"].get("expires_in", 600))
     while time.time() < deadline:
         time.sleep(interval)
         try:
-            tok = form_post(oidc["token_endpoint"], {
-                "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
-                "client_id": CLIENT_ID,
-                "device_code": init["device_code"],
-            })
-            set_instance_creds(b, tok, oidc)
-            print(f"Authenticated to {b}; credentials saved in {CREDS_FILE}")
+            finish_device_login(state)
             return
         except RenkuError as e:
             msg = str(e)
@@ -264,7 +425,16 @@ def cmd_auth_login(args: argparse.Namespace) -> None:
                 interval += 5
                 continue
             raise
-    raise RenkuError("Device authorization timed out")
+    raise RenkuError("Device authorization timed out; run auth complete after approving the code")
+
+
+def cmd_auth_complete(args: argparse.Namespace) -> None:
+    b = base_url()
+    path = Path(args.state) if args.state else auth_state_path(b)
+    if not path.exists():
+        raise RenkuError(f"No pending auth state found at {path}. Run auth login --user-code-only first.")
+    state = json.loads(path.read_text())
+    finish_device_login(state)
 
 
 def cmd_auth_status(args: argparse.Namespace) -> None:
@@ -493,6 +663,22 @@ def cmd_launcher_project_list(args: argparse.Namespace) -> None:
     print_out(http_json("GET", f"/projects/{args.project}/session_launchers"), args)
 
 
+def add_iframe_url(session: dict[str, Any]) -> dict[str, Any]:
+    try:
+        project_id = session.get("project_id")
+        name = session.get("name") or session.get("id")
+        if project_id and name:
+            project = http_json("GET", f"/projects/{project_id}")
+            ns = project.get("namespace")
+            slug = project.get("slug")
+            if ns and slug:
+                session = dict(session)
+                session["iframe_url"] = f"{base_url()}/p/{urllib.parse.quote(str(ns))}/{urllib.parse.quote(str(slug))}/sessions/show/{urllib.parse.quote(str(name))}"
+    except Exception:
+        pass
+    return session
+
+
 def cmd_session_launch(args: argparse.Namespace) -> None:
     body = {"launcher_id": args.launcher}
     if args.type: body["session_type"] = args.type
@@ -500,8 +686,8 @@ def cmd_session_launch(args: argparse.Namespace) -> None:
     if args.resource_class_id is not None: body["resource_class_id"] = args.resource_class_id
     if args.dry_run:
         print_out({"POST": "/sessions", "body": body}, args); return
-    data = http_json("POST", "/sessions", body)
-    print_out(data, args, f"Launched {body.get('session_type','interactive')} session {data.get('id') or ''}")
+    data = add_iframe_url(http_json("POST", "/sessions", body))
+    print_out(data, args, f"Launched {body.get('session_type','interactive')} session {data.get('name') or data.get('id') or ''}")
 
 
 def cmd_session_list(args: argparse.Namespace) -> None:
@@ -509,7 +695,7 @@ def cmd_session_list(args: argparse.Namespace) -> None:
 
 
 def cmd_session_get(args: argparse.Namespace) -> None:
-    print_out(http_json("GET", f"/sessions/{args.session}"), args)
+    print_out(add_iframe_url(http_json("GET", f"/sessions/{args.session}")), args)
 
 
 def cmd_session_logs(args: argparse.Namespace) -> None:
@@ -519,6 +705,50 @@ def cmd_session_logs(args: argparse.Namespace) -> None:
 def cmd_session_delete(args: argparse.Namespace) -> None:
     confirm(args, f"Stop/delete session {args.session}?")
     print_out(http_json("DELETE", f"/sessions/{args.session}"), args, "Session deleted")
+
+
+def extract_log_tail(logs: Any, lines: int = 5) -> str:
+    if isinstance(logs, dict):
+        text = "\n".join(str(v) for v in logs.values())
+    else:
+        text = str(logs)
+    useful = [ln for ln in text.splitlines() if ln.strip()]
+    return "\n".join(useful[-lines:])
+
+
+def cmd_session_wait(args: argparse.Namespace) -> None:
+    if getattr(args, "wait_for_job", False):
+        terminal = {"succeeded", "completed", "finished", "failed", "error", "stopped"}
+        success = {"succeeded", "completed", "finished"}
+    else:
+        terminal = {"running", "succeeded", "completed", "finished", "failed", "error", "stopped"}
+        success = {"running", "succeeded", "completed", "finished"}
+    end = time.time() + args.timeout
+    last_state = None
+    session: dict[str, Any] = {}
+    while time.time() < end:
+        session = add_iframe_url(http_json("GET", f"/sessions/{args.session}"))
+        status = session.get("status") or {}
+        state = status.get("state") or session.get("state") or "unknown"
+        ready = f"{status.get('ready_containers', '?')}/{status.get('total_containers', '?')}"
+        if not args.json and (args.verbose or state != last_state):
+            print(f"session {args.session}: {state} containers={ready}")
+        if args.logs:
+            try:
+                tail = extract_log_tail(http_json("GET", f"/sessions/{args.session}/logs"), args.log_lines)
+                if tail and not args.json:
+                    print(tail)
+            except Exception as e:
+                if args.verbose and not args.json:
+                    print(f"logs unavailable: {e}")
+        if state in terminal:
+            print_out(session, args)
+            if state not in success:
+                return
+            return
+        last_state = state
+        time.sleep(args.interval)
+    raise RenkuError(f"Timed out waiting for session/job {args.session}")
 
 
 def add_common(p):
@@ -546,7 +776,8 @@ def main(argv=None) -> int:
     sub = root.add_subparsers(dest="cmd", required=True)
 
     p = sub.add_parser("auth"); s = p.add_subparsers(dest="auth_cmd", required=True)
-    q=s.add_parser("login"); q.add_argument("--scope", default="openid profile email offline_access"); q.set_defaults(func=cmd_auth_login)
+    q=s.add_parser("login"); q.add_argument("--scope", default="openid profile email offline_access"); q.add_argument("--method", choices=["auto","rnk","device"], default="auto", help="auto prefers official rnk login, then falls back to built-in device flow"); q.add_argument("--user-code-only", action="store_true", help="print device URL/code and save state, but do not poll"); q.add_argument("--no-rnk", action="store_true", help="skip official rnk login even in auto mode"); q.set_defaults(func=cmd_auth_login)
+    q=s.add_parser("complete"); q.add_argument("--state", help="path to pending device-flow state file"); q.set_defaults(func=cmd_auth_complete)
     q=s.add_parser("status"); q.set_defaults(func=cmd_auth_status)
     q=s.add_parser("logout"); q.set_defaults(func=cmd_auth_logout)
 
@@ -596,10 +827,12 @@ def main(argv=None) -> int:
     q=sp.add_parser("get"); q.add_argument("session"); q.set_defaults(func=cmd_session_get)
     q=sp.add_parser("logs"); q.add_argument("session"); q.set_defaults(func=cmd_session_logs)
     q=sp.add_parser("delete"); q.add_argument("session"); q.set_defaults(func=cmd_session_delete)
+    q=sp.add_parser("wait"); q.add_argument("session"); q.add_argument("--timeout", type=int, default=900); q.add_argument("--interval", type=int, default=10); q.add_argument("--logs", action="store_true"); q.add_argument("--log-lines", type=int, default=5); q.add_argument("--verbose", action="store_true"); q.set_defaults(func=cmd_session_wait)
 
     p=sub.add_parser("job"); sp=p.add_subparsers(dest="job_cmd", required=True)
     q=sp.add_parser("run"); q.add_argument("--launcher", required=True); q.add_argument("--disk-storage", type=int); q.add_argument("--resource-class-id", type=int); q.set_defaults(type="non-interactive", func=cmd_session_launch)
     q=sp.add_parser("list"); q.set_defaults(type="non-interactive", func=cmd_session_list)
+    q=sp.add_parser("wait"); q.add_argument("session"); q.add_argument("--timeout", type=int, default=900); q.add_argument("--interval", type=int, default=10); q.add_argument("--logs", action="store_true", default=True); q.add_argument("--log-lines", type=int, default=8); q.add_argument("--verbose", action="store_true"); q.set_defaults(func=cmd_session_wait, wait_for_job=True)
 
     args = root.parse_args(argv)
     try:

@@ -1,0 +1,687 @@
+[
+  {
+    "created_by": "d18366ec-de3a-4275-828b-c1df8e53da86",
+    "creation_date": "2026-05-22T15:00:40.133774Z",
+    "etag": "\"3E7936E08E326983A8245939398092A2\"",
+    "id": "01KS837TK7S7M1YA61DEQXK2Y9",
+    "keywords": [],
+    "name": "output-data",
+    "namespace": "rokroskar/renku-demo-air-quality-analysis",
+    "slug": "output-data",
+    "storage": {
+      "configuration": {
+        "pass": "<sensitive>",
+        "provider": "shared",
+        "public_link": "https://polybox.ethz.ch/index.php/s/SRQtC8NXxKxiLPo",
+        "type": "polybox"
+      },
+      "readonly": false,
+      "sensitive_fields": [
+        {
+          "advanced": false,
+          "default": "",
+          "default_str": "",
+          "exclusive": false,
+          "help": "Password.",
+          "ispassword": "<redacted>",
+          "name": "pass",
+          "required": false,
+          "sensitive": true,
+          "type": "string"
+        }
+      ],
+      "source_path": "/",
+      "storage_type": "polybox",
+      "target_path": "output-data"
+    },
+    "visibility": "private"
+  },
+  {
+    "created_by": "d18366ec-de3a-4275-828b-c1df8e53da86",
+    "creation_date": "2026-05-22T14:49:30.757618Z",
+    "description": "Air quality CSV files mounted from a shared Polybox folder.",
+    "etag": "\"EA42DF7021243E759A7447D36797F637\"",
+    "id": "01KS82KCWGKA3P4KDKHWSZ1EPQ",
+    "keywords": [],
+    "name": "Zurich Air Quality Data",
+    "namespace": "rokroskar",
+    "slug": "zurich-air-quality-data",
+    "storage": {
+      "configuration": {
+        "provider": "shared",
+        "public_link": "https://polybox.ethz.ch/index.php/s/6EsHI6MF83mg52o",
+        "type": "polybox"
+      },
+      "readonly": true,
+      "sensitive_fields": [],
+      "source_path": "/",
+      "storage_type": "polybox",
+      "target_path": "zurich-air-quality-data"
+    },
+    "visibility": "private"
+  },
+  {
+    "created_by": "16ad1834-0e94-4b68-8d6d-f39961ff555d",
+    "creation_date": "2026-04-20T11:26:18.551926Z",
+    "etag": "\"165B1210564E3CAE6F629772986F15A5\"",
+    "id": "01KPNA8AEDK2NDSSVVZN2GEG5B",
+    "keywords": [],
+    "name": "azure_read-renku-folder",
+    "namespace": "renku-team/renku-project",
+    "slug": "azure-read-renku-folder",
+    "storage": {
+      "configuration": {
+        "archive_tier_delete": false,
+        "client_send_certificate_chain": false,
+        "directory_markers": false,
+        "disable_checksum": false,
+        "disable_instance_discovery": false,
+        "memory_pool_use_mmap": false,
+        "no_check_container": false,
+        "no_head_object": false,
+        "sas_url": "<sensitive>",
+        "type": "azureblob",
+        "use_az": false,
+        "use_copy_blob": true,
+        "use_emulator": false,
+        "use_msi": false
+      },
+      "readonly": true,
+      "sensitive_fields": [
+        {
+          "advanced": false,
+          "default": "",
+          "default_str": "",
+          "exclusive": false,
+          "help": "SAS URL for container level access only.\n\nLeave blank if using account/key or Emulator.",
+          "ispassword": "<redacted>",
+          "name": "sas_url",
+          "required": false,
+          "sensitive": true,
+          "type": "string"
+        }
+      ],
+      "source_path": "/",
+      "storage_type": "azureblob",
+      "target_path": "azure-read-renku-folder"
+    },
+    "visibility": "public"
+  },
+  {
+    "created_by": "16ad1834-0e94-4b68-8d6d-f39961ff555d",
+    "creation_date": "2026-04-20T11:14:11.234061Z",
+    "etag": "\"04D104EA386326763788C9B08BF073AD\"",
+    "id": "01KPN9J4612W0YXPRJFPV1B040",
+    "keywords": [],
+    "name": "azure_Shared access signature",
+    "namespace": "renku-team/renku-project",
+    "slug": "azure-shared-access-signature",
+    "storage": {
+      "configuration": {
+        "archive_tier_delete": false,
+        "client_send_certificate_chain": false,
+        "directory_markers": false,
+        "disable_checksum": false,
+        "disable_instance_discovery": false,
+        "memory_pool_use_mmap": false,
+        "no_check_container": false,
+        "no_head_object": false,
+        "sas_url": "<sensitive>",
+        "type": "azureblob",
+        "use_az": false,
+        "use_copy_blob": true,
+        "use_emulator": false,
+        "use_msi": false
+      },
+      "readonly": true,
+      "sensitive_fields": [
+        {
+          "advanced": false,
+          "default": "",
+          "default_str": "",
+          "exclusive": false,
+          "help": "SAS URL for container level access only.\n\nLeave blank if using account/key or Emulator.",
+          "ispassword": "<redacted>",
+          "name": "sas_url",
+          "required": false,
+          "sensitive": true,
+          "type": "string"
+        }
+      ],
+      "source_path": "/",
+      "storage_type": "azureblob",
+      "target_path": "azure-shared-access-signature"
+    },
+    "visibility": "public"
+  },
+  {
+    "created_by": "16ad1834-0e94-4b68-8d6d-f39961ff555d",
+    "creation_date": "2026-04-20T10:57:16.843606Z",
+    "etag": "\"AB2545D63C041C34792CAD2E859DBF23\"",
+    "id": "01KPN8K5JN7JKN2YWHK5R3M79Y",
+    "keywords": [],
+    "name": "renku-folder-readonly",
+    "namespace": "renku-team/renku-project",
+    "slug": "renku-folder-readonly",
+    "storage": {
+      "configuration": {
+        "archive_tier_delete": false,
+        "client_send_certificate_chain": false,
+        "directory_markers": false,
+        "disable_checksum": false,
+        "disable_instance_discovery": false,
+        "memory_pool_use_mmap": false,
+        "no_check_container": false,
+        "no_head_object": false,
+        "sas_url": "<sensitive>",
+        "type": "azureblob",
+        "use_az": false,
+        "use_copy_blob": true,
+        "use_emulator": false,
+        "use_msi": false
+      },
+      "readonly": true,
+      "sensitive_fields": [
+        {
+          "advanced": false,
+          "default": "",
+          "default_str": "",
+          "exclusive": false,
+          "help": "SAS URL for container level access only.\n\nLeave blank if using account/key or Emulator.",
+          "ispassword": "<redacted>",
+          "name": "sas_url",
+          "required": false,
+          "sensitive": true,
+          "type": "string"
+        }
+      ],
+      "source_path": "/",
+      "storage_type": "azureblob",
+      "target_path": "renku-folder-readonly"
+    },
+    "visibility": "public"
+  },
+  {
+    "created_by": "16ad1834-0e94-4b68-8d6d-f39961ff555d",
+    "creation_date": "2026-04-20T08:38:36.460064Z",
+    "etag": "\"A9019B793DE1AB5DB609D5C61DC8BF30\"",
+    "id": "01KPN0N861TCDCAFJZJSJAPKCE",
+    "keywords": [],
+    "name": "azure_blob",
+    "namespace": "renku-team/renku-project",
+    "slug": "azure-blob",
+    "storage": {
+      "configuration": {
+        "account": "elisabettestsa",
+        "key": "<sensitive>",
+        "type": "azureblob"
+      },
+      "readonly": false,
+      "sensitive_fields": [
+        {
+          "advanced": false,
+          "default": "",
+          "default_str": "",
+          "exclusive": false,
+          "help": "Storage Account Shared Key.\n\nLeave blank to use SAS URL or Emulator.",
+          "ispassword": "<redacted>",
+          "name": "key",
+          "required": false,
+          "sensitive": true,
+          "type": "string"
+        }
+      ],
+      "source_path": "/",
+      "storage_type": "azureblob",
+      "target_path": "azure-blob"
+    },
+    "visibility": "public"
+  },
+  {
+    "created_by": "16ad1834-0e94-4b68-8d6d-f39961ff555d",
+    "creation_date": "2026-04-20T08:35:52.816289Z",
+    "etag": "\"0C9E9913522D33DEA805708873683FDF\"",
+    "id": "01KPN0G8D68FTGZ2WAVVBN8FJN",
+    "keywords": [],
+    "name": "renku folder",
+    "namespace": "renku-team/renku-project",
+    "slug": "renku-folder",
+    "storage": {
+      "configuration": {
+        "archive_tier_delete": false,
+        "client_send_certificate_chain": false,
+        "directory_markers": false,
+        "disable_checksum": false,
+        "disable_instance_discovery": false,
+        "memory_pool_use_mmap": false,
+        "no_check_container": false,
+        "no_head_object": false,
+        "sas_url": "<sensitive>",
+        "type": "azureblob",
+        "use_az": false,
+        "use_copy_blob": true,
+        "use_emulator": false,
+        "use_msi": false
+      },
+      "readonly": true,
+      "sensitive_fields": [
+        {
+          "advanced": false,
+          "default": "",
+          "default_str": "",
+          "exclusive": false,
+          "help": "SAS URL for container level access only.\n\nLeave blank if using account/key or Emulator.",
+          "ispassword": "<redacted>",
+          "name": "sas_url",
+          "required": false,
+          "sensitive": true,
+          "type": "string"
+        }
+      ],
+      "source_path": "/",
+      "storage_type": "azureblob",
+      "target_path": "renku-folder"
+    },
+    "visibility": "public"
+  },
+  {
+    "created_by": "16ad1834-0e94-4b68-8d6d-f39961ff555d",
+    "creation_date": "2026-04-20T08:25:34.968730Z",
+    "etag": "\"C44A005276DC73B01411992CB00F32AC\"",
+    "id": "01KPMZXD0K4ANG3M9ADB1DDXBP",
+    "keywords": [],
+    "name": "Teaching assets",
+    "namespace": "renku-team/renku-project",
+    "slug": "teaching-assets",
+    "storage": {
+      "configuration": {
+        "archive_tier_delete": false,
+        "client_send_certificate_chain": false,
+        "directory_markers": false,
+        "disable_checksum": false,
+        "disable_instance_discovery": false,
+        "memory_pool_use_mmap": false,
+        "no_check_container": false,
+        "no_head_object": false,
+        "sas_url": "<sensitive>",
+        "type": "azureblob",
+        "use_az": false,
+        "use_copy_blob": true,
+        "use_emulator": false,
+        "use_msi": false
+      },
+      "readonly": true,
+      "sensitive_fields": [
+        {
+          "advanced": false,
+          "default": "",
+          "default_str": "",
+          "exclusive": false,
+          "help": "SAS URL for container level access only.\n\nLeave blank if using account/key or Emulator.",
+          "ispassword": "<redacted>",
+          "name": "sas_url",
+          "required": false,
+          "sensitive": true,
+          "type": "string"
+        }
+      ],
+      "source_path": "/",
+      "storage_type": "azureblob",
+      "target_path": "teaching-assets"
+    },
+    "visibility": "public"
+  },
+  {
+    "created_by": "9972f86e-0952-49a3-a2c2-3677d76b9e53",
+    "creation_date": "2026-03-31T08:54:40.843776Z",
+    "etag": "\"021047CEDFDF38032EC8E9249D357797\"",
+    "id": "01KN1HM9ZZF4FSZPYB21YAHKYF",
+    "keywords": [],
+    "name": "drive",
+    "namespace": "dandrea.cordoba/sdsc-academic-p",
+    "slug": "drive",
+    "storage": {
+      "configuration": {
+        "type": "drive"
+      },
+      "readonly": true,
+      "sensitive_fields": [],
+      "source_path": "/",
+      "storage_type": "drive",
+      "target_path": "drive"
+    },
+    "visibility": "public"
+  },
+  {
+    "created_by": "e25cd000-59be-4e52-86aa-fb4fc60a12c8",
+    "creation_date": "2026-03-09T13:10:19.825041Z",
+    "description": "This is a rich metadata record for the \"AeroSense Measurements: Aventa AV-7 Taggenberg Winter 2022-2023 Campaign\".\u00a0 See: \"Related works\", for the data itself.The record contains wind turbine, sensor location, and sensor properties metadata enchoded as JSON files. Wind turbine metadata follows\u00a0WindIO schema.Pressure sensor location metadata follows AeroSense sensor geometry schema.",
+    "doi": "10.5281/zenodo.14518087",
+    "etag": "\"107CD355AF225C916857915E1C3FC28F\"",
+    "id": "01KK9BGN61YTXMQW21BWQVJCWH",
+    "keywords": [
+      "Wind Turbine"
+    ],
+    "name": "Aventa AV-7 Taggenberg Wind Turbine and AeroSense Measurement Campaign - Blade Aerodynamics (Met...",
+    "publisher_name": "Zenodo",
+    "slug": "doi-10.5281-zenodo.14518087",
+    "storage": {
+      "configuration": {
+        "doi": "10.5281/zenodo.14518087",
+        "provider": "zenodo",
+        "type": "doi"
+      },
+      "readonly": true,
+      "sensitive_fields": [],
+      "source_path": "/",
+      "storage_type": "doi",
+      "target_path": "aventa-av-7-taggenberg-wind-tu-doi-10.5281-zenodo.14518087"
+    },
+    "visibility": "public"
+  },
+  {
+    "created_by": "e25cd000-59be-4e52-86aa-fb4fc60a12c8",
+    "creation_date": "2026-03-09T08:30:21.026765Z",
+    "etag": "\"61B6FAF9059E65A00B9CCF724AD0D9A6\"",
+    "id": "01KK8VFYBGNKNMGFZW5KP3QCW0",
+    "keywords": [],
+    "name": "Google Drive",
+    "namespace": "flora.thiebaut",
+    "slug": "google-drive",
+    "storage": {
+      "configuration": {
+        "type": "drive"
+      },
+      "readonly": false,
+      "sensitive_fields": [],
+      "source_path": "/",
+      "storage_type": "drive",
+      "target_path": "google-drive"
+    },
+    "visibility": "public"
+  },
+  {
+    "created_by": "e25cd000-59be-4e52-86aa-fb4fc60a12c8",
+    "creation_date": "2026-03-09T08:30:03.250454Z",
+    "etag": "\"E94CE8302F608DE16F3812C3F522E825\"",
+    "id": "01KK8VFCZXX18G4ECP8B13QVZD",
+    "keywords": [],
+    "name": "Dropbox",
+    "namespace": "flora.thiebaut",
+    "slug": "dropbox",
+    "storage": {
+      "configuration": {
+        "type": "dropbox"
+      },
+      "readonly": false,
+      "sensitive_fields": [],
+      "source_path": "/",
+      "storage_type": "dropbox",
+      "target_path": "dropbox"
+    },
+    "visibility": "public"
+  },
+  {
+    "created_by": "4d9df121-db88-4988-8b12-aad43f75d45c",
+    "creation_date": "2026-02-24T23:54:35.764478Z",
+    "etag": "\"EB9D19CDF1A93FF19F690E9FF2266812\"",
+    "id": "01KJ916YD487ZMWX9CFVCYRCK9",
+    "keywords": [],
+    "name": "giab",
+    "namespace": "tasko.olevski-2/p1",
+    "slug": "giab",
+    "storage": {
+      "configuration": {
+        "provider": "AWS",
+        "type": "s3"
+      },
+      "readonly": true,
+      "sensitive_fields": [],
+      "source_path": "giab",
+      "storage_type": "s3",
+      "target_path": "giab"
+    },
+    "visibility": "public"
+  },
+  {
+    "created_by": "4d9df121-db88-4988-8b12-aad43f75d45c",
+    "creation_date": "2026-01-15T15:32:58.133347Z",
+    "description": "This is an R script written to calculate the relative terrain aspect parameter, which is utilized in the preferential snowfall downscaling scheme for mountainous terrain. The code reads a terrain aspect angle grid from file 'terrain_aspect_grid.txt' and writes the computed relative terrain aspect angle grid to file 'delta_psi_grid.txt'.",
+    "doi": "10.16904/envidat.435",
+    "etag": "\"76BF442D18D44A8071C2B0C168501A47\"",
+    "id": "01KF14KPC7Y8GM3GFEM1Z53JE1",
+    "keywords": [
+      "COMPLEX TOPOGRAPHY",
+      "DOWNSCALING",
+      "PREFERENTIAL DEPOSITION",
+      "R SCRIPT",
+      "SNOWFALL"
+    ],
+    "name": "Snowfall  downscaling Source code to calculate the relative terrain aspect parameter",
+    "publisher_name": "EnviDat",
+    "publisher_url": "https://www.re3data.org/repository/r3d100012587",
+    "slug": "doi-10.16904-envidat.435",
+    "storage": {
+      "configuration": {
+        "endpoint": "https://os.zhdk.cloud.switch.ch",
+        "provider": "Other",
+        "type": "s3"
+      },
+      "readonly": true,
+      "sensitive_fields": [],
+      "source_path": "/envidat-doi/10.16904_envidat.435",
+      "storage_type": "envidat_v1",
+      "target_path": "snowfall-downscaling-source-co-doi-10.16904-envidat.435"
+    },
+    "visibility": "public"
+  },
+  {
+    "created_by": "4d9df121-db88-4988-8b12-aad43f75d45c",
+    "creation_date": "2026-01-15T15:32:11.986905Z",
+    "description": "CHELSA is a mechanistic downscaling model that links large-scale atmospheric conditions with local topographic factors to produce very high-resolution climate data. It includes commonly used climate variables for impact modeling, such as air temperature, precipitation, humidity, solar radiation, wind speed, and derived variables.\n\nCHELSAcerra daily is a high resolution climate dataset for air-temperatures generated with the CHELSA downscaling model using the Copernicus regional reanalysis for...",
+    "doi": "10.16904/envidat.703",
+    "etag": "\"C8833EA3A4260D9D69B26C02BA93F2EF\"",
+    "id": "01KF14J9NKCDM3Z193ZN47V25C",
+    "keywords": [
+      "AIR TEMPERATURE",
+      "CLIMATE",
+      "EUROPE",
+      "MAXIMUM TEMPERATURE",
+      "MINIMUM TEMPERATURE",
+      "REANALYSIS"
+    ],
+    "name": "CHELSAcerra-daily",
+    "publisher_name": "EnviDat",
+    "publisher_url": "https://www.re3data.org/repository/r3d100012587",
+    "slug": "doi-10.16904-envidat.703",
+    "storage": {
+      "configuration": {
+        "endpoint": "https://os.zhdk.cloud.switch.ch",
+        "provider": "Other",
+        "type": "s3"
+      },
+      "readonly": true,
+      "sensitive_fields": [],
+      "source_path": "/envidat-doi/10.16904_envidat.703",
+      "storage_type": "envidat_v1",
+      "target_path": "chelsacerra-daily-doi-10.16904-envidat.703"
+    },
+    "visibility": "public"
+  },
+  {
+    "created_by": "d18366ec-de3a-4275-828b-c1df8e53da86",
+    "creation_date": "2026-01-15T12:44:10.909611Z",
+    "description": "This dataset forms the base of the paper 'Contrasting canopy air temperatures across complex terrain during the snow season' submitted to JGR Atmospheres. It aims to ensure full reproducibility of the figures by providing all relevant scripts (MATLAB R2024a), functions, processed data, and primary data. The primary data consists of three January-April periods in two Alpine valleys (Fl\u00fcela, 2023; Monstein; 2024, 2025) of: \ni) Ventilated canopy air temperatures and humidity (60s intervals) meas...",
+    "doi": "10.16904/envidat.722",
+    "etag": "\"350E5BA48D7E736DBD89D32264DC7C29\"",
+    "id": "01KF0TYMP2BVVPAK053D95R10Y",
+    "keywords": [
+      "CANOPY COVER",
+      "FOREST CANOPY",
+      "FOREST SNOW",
+      "SNOW",
+      "SUBALPINE"
+    ],
+    "name": "Canopy air temperatures in subalpine forests during three snow seasons",
+    "publisher_name": "EnviDat",
+    "publisher_url": "https://www.re3data.org/repository/r3d100012587",
+    "slug": "doi-10.16904-envidat.722",
+    "storage": {
+      "configuration": {
+        "endpoint": "https://os.zhdk.cloud.switch.ch",
+        "provider": "Other",
+        "type": "s3"
+      },
+      "readonly": true,
+      "sensitive_fields": [],
+      "source_path": "/envidat-doi/10.16904_envidat.722",
+      "storage_type": "envidat_v1",
+      "target_path": "canopy-air-temperatures-in-sub-doi-10.16904-envidat.722"
+    },
+    "visibility": "public"
+  },
+  {
+    "created_by": "a1aabecd-b677-4d17-9347-da912994e869",
+    "creation_date": "2026-01-13T17:10:12.381668Z",
+    "etag": "\"A637346B1C8AFEDD9C6D1280EC863FED\"",
+    "id": "01KEW5C9PCMMWCFT6PZZZS4FP8",
+    "keywords": [],
+    "name": "DCSM WebDAV",
+    "namespace": "dcsm-admin/test-from-python-2",
+    "slug": "dcsm-webdav",
+    "storage": {
+      "configuration": {
+        "pass": "<sensitive>",
+        "type": "webdav",
+        "url": "https://dcsm.epfl.ch/dcsm-intranet/webdav/zenodo-xxxxxxxx",
+        "user": "username"
+      },
+      "readonly": true,
+      "sensitive_fields": [
+        {
+          "advanced": false,
+          "default": "",
+          "default_str": "",
+          "exclusive": false,
+          "help": "Password.",
+          "ispassword": "<redacted>",
+          "name": "pass",
+          "required": false,
+          "sensitive": true,
+          "type": "string"
+        }
+      ],
+      "source_path": "/",
+      "storage_type": "webdav",
+      "target_path": "study-data"
+    },
+    "visibility": "public"
+  },
+  {
+    "created_by": "a1aabecd-b677-4d17-9347-da912994e869",
+    "creation_date": "2026-01-13T17:00:56.656354Z",
+    "etag": "\"008D28A150255E27CDEB3D0AD844DF3C\"",
+    "id": "01KEW4VAZV5JBJ68E8QN9SAP5K",
+    "keywords": [],
+    "name": "connector Name",
+    "namespace": "dcsm-admin/test-project-created-on-web-interface",
+    "slug": "connector-name",
+    "storage": {
+      "configuration": {
+        "pass": "<sensitive>",
+        "type": "webdav",
+        "url": "https://example.com",
+        "user": "my-username"
+      },
+      "readonly": true,
+      "sensitive_fields": [
+        {
+          "advanced": false,
+          "default": "",
+          "default_str": "",
+          "exclusive": false,
+          "help": "Password.",
+          "ispassword": "<redacted>",
+          "name": "pass",
+          "required": false,
+          "sensitive": true,
+          "type": "string"
+        }
+      ],
+      "source_path": "/",
+      "storage_type": "webdav",
+      "target_path": "connector-name"
+    },
+    "visibility": "public"
+  },
+  {
+    "created_by": "a1aabecd-b677-4d17-9347-da912994e869",
+    "creation_date": "2026-01-13T16:48:59.043478Z",
+    "etag": "\"40E0388D9835C289EDB10A8030EF1EEE\"",
+    "id": "01KEW45E6N7FBCAHWD30JTJAAX",
+    "keywords": [],
+    "name": "Test webdav connector",
+    "namespace": "dcsm-admin/test-project-created-on-web-interface",
+    "slug": "test-webdav-connector",
+    "storage": {
+      "configuration": {
+        "pass": "<sensitive>",
+        "type": "webdav",
+        "url": "https://dcsm.epfl.ch/webdav-test",
+        "user": "username"
+      },
+      "readonly": true,
+      "sensitive_fields": [
+        {
+          "advanced": false,
+          "default": "",
+          "default_str": "",
+          "exclusive": false,
+          "help": "Password.",
+          "ispassword": "<redacted>",
+          "name": "pass",
+          "required": false,
+          "sensitive": true,
+          "type": "string"
+        }
+      ],
+      "source_path": "",
+      "storage_type": "webdav",
+      "target_path": "test-webdav-connector"
+    },
+    "visibility": "public"
+  },
+  {
+    "created_by": "d18366ec-de3a-4275-828b-c1df8e53da86",
+    "creation_date": "2025-12-23T09:58:05.567879Z",
+    "description": "The study area included the cities of Basel, Lugano and Zurich. The sampling design reflected four main city districts related to four categories of tree cover (Figure 1): 1) industrial/commercial areas, 0-20% tree cover; 2) residential areas, 20-40% tree cover; 3) urban parks and cemeteries, 40-60% tree cover; 4) peri-urban forests (natural/semi-natural forests), 60-100% tree cover. The tree cover gradient was evaluated across a square grid with a square side length of 100 m. For each square...",
+    "doi": "10.16904/envidat.636",
+    "etag": "\"80DD2B0B369A9162D68621DABD42611E\"",
+    "id": "01KD5A9ZQNT3X9ESYGFHF5VJFR",
+    "keywords": [
+      "BIODIVERSITY",
+      "BIRDS",
+      "ENVIRONMENTAL GRADIENTS",
+      "PERIURBAN",
+      "SPATIALLY-DISTRIBUTED SAMPLING",
+      "URBAN"
+    ],
+    "name": "Urban birds point counts data",
+    "publisher_name": "EnviDat",
+    "publisher_url": "https://www.re3data.org/repository/r3d100012587",
+    "slug": "doi-10.16904-envidat.636",
+    "storage": {
+      "configuration": {
+        "endpoint": "https://os.zhdk.cloud.switch.ch",
+        "provider": "Other",
+        "type": "s3"
+      },
+      "readonly": true,
+      "sensitive_fields": [],
+      "source_path": "/envidat-doi/10.16904_envidat.636",
+      "storage_type": "envidat_v1",
+      "target_path": "urban-birds-point-counts-data-doi-10.16904-envidat.636"
+    },
+    "visibility": "public"
+  }
+]

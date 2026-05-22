@@ -1,0 +1,14 @@
+{
+  "project_id": "01KS81NK8RB0EC9BNW26BC7GR7",
+  "name": "JupyterLab from repository",
+  "description": "Builds a JupyterLab environment from the linked air-quality analysis repository.",
+  "environment": {
+    "environment_image_source": "build",
+    "repository": "https://github.com/rokroskar/renku-demo-air-quality-analysis",
+    "builder_variant": "python",
+    "frontend_variant": "jupyterlab",
+    "repository_revision": "main",
+    "context_dir": ".",
+    "platforms": ["linux/amd64"]
+  }
+}

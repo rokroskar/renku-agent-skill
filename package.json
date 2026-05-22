@@ -1,0 +1,32 @@
+{
+  "name": "pi-renku-skill",
+  "version": "0.1.0",
+  "description": "Portable Agent Skill for managing Renku/RenkuLab projects, data connectors, launchers, sessions, and jobs.",
+  "private": false,
+  "type": "module",
+  "keywords": [
+    "pi-package",
+    "agent-skill",
+    "renku",
+    "renkulab",
+    "data-science"
+  ],
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OWNER/pi-renku-skill.git"
+  },
+  "pi": {
+    "skills": [
+      "./skills"
+    ]
+  },
+  "files": [
+    "skills/",
+    "README.md",
+    "package.json"
+  ],
+  "scripts": {
+    "check": "python3 -m py_compile skills/renku/scripts/renku_agent.py && python3 skills/renku/scripts/renku_agent.py --help >/dev/null"
+  }
+}

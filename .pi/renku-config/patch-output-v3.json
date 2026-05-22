@@ -1,0 +1,32 @@
+{
+  "creation_date": "2026-05-22T14:33:22Z",
+  "description": "Non-interactive launcher that executes notebooks and writes rendered notebooks to the output-data connector.",
+  "environment": {
+    "args": [
+      "python",
+      "-c",
+      "import pathlib, subprocess; root=pathlib.Path('/home/renku/work'); repo=root/'renku-demo-air-quality-analysis'; outroot=root/'output-data'/'executed-notebooks'; nbs=[p for p in repo.rglob('*.ipynb') if '.ipynb_checkpoints' not in p.parts]; print('Notebooks:', [str(p.relative_to(repo)) for p in nbs], flush=True); assert nbs, 'No notebooks found'; [(lambda nb, rel: ((outroot/rel.parent).mkdir(parents=True, exist_ok=True), print(f'Executing {nb} -> {outroot/rel}', flush=True), subprocess.run(['jupyter','nbconvert','--to','notebook','--execute',str(nb),'--output-dir',str(outroot/rel.parent),'--output',rel.name,'--ExecutePreprocessor.timeout=1200'], check=True)))(nb, nb.relative_to(repo)) for nb in nbs]"
+    ],
+    "command": [
+      "/cnb/lifecycle/launcher"
+    ],
+    "container_image": "harbor.dev.renku.ch/renku-build/renku-build:renku-01ks81nvkqg6wzvtad27z39qt2",
+    "creation_date": "2026-05-22T14:33:22Z",
+    "default_url": "/",
+    "description": "External image environment based on the successful build; runs notebooks via the CNB lifecycle launcher.",
+    "environment_image_source": "image",
+    "environment_kind": "CUSTOM",
+    "gid": 1000,
+    "id": "01KS81NVJDVSX3BD5ZTCP6DN57",
+    "is_archived": false,
+    "mount_directory": "/home/renku/work",
+    "name": "Run notebooks batch",
+    "port": 8888,
+    "strip_path_prefix": false,
+    "uid": 1000,
+    "working_directory": "/home/renku/work"
+  },
+  "id": "01KS81NVJDCCNW793JV6465EEE",
+  "name": "Run notebooks batch",
+  "project_id": "01KS81NK8RB0EC9BNW26BC7GR7"
+}

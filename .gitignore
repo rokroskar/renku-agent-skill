@@ -1,0 +1,30 @@
+# Local pi runtime/config
+.pi/renku-config/
+.pi/tmp/
+.pi/sandbox.json
+.pi/settings.json
+
+# Local pi project skill copy (package source is skills/renku/)
+.pi/skills/
+
+# Jujutsu / VCS local state
+.jj/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# Secrets / credentials
+credentials.json
+*.token.json
+*.secret.json
+.env
+.env.*
+!.env.example
+
+# Runtime artifacts
+*.log
+.DS_Store

@@ -1,0 +1,21 @@
+{
+  "name": "Run notebooks batch",
+  "description": "Non-interactive launcher that runs all Jupyter notebooks using the built repository image.",
+  "environment": {
+    "name": "Run notebooks batch",
+    "description": "External image environment based on the successful build; runs notebooks via the CNB lifecycle launcher.",
+    "environment_image_source": "image",
+    "environment_kind": "CUSTOM",
+    "container_image": "harbor.dev.renku.ch/renku-build/renku-build:renku-01ks81nvkqg6wzvtad27z39qt2",
+    "default_url": "/",
+    "working_directory": "/home/renku/work",
+    "mount_directory": "/home/renku/work",
+    "port": 8888,
+    "command": ["/cnb/lifecycle/launcher"],
+    "args": [
+      "bash",
+      "-lc",
+      "set -euxo pipefail; cd /home/renku/work; echo 'Searching for notebooks...'; find . -path '*/.ipynb_checkpoints/*' -prune -o -name '*.ipynb' -print; find . -path '*/.ipynb_checkpoints/*' -prune -o -name '*.ipynb' -print0 | xargs -0 -r -n 1 jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.timeout=1200"
+    ]
+  }
+}

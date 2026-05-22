@@ -1,0 +1,17 @@
+{
+  "name": "Zurich Air Quality Data",
+  "namespace": "rokroskar",
+  "slug": "zurich-air-quality-data",
+  "visibility": "private",
+  "description": "Air quality CSV files mounted from a shared Polybox folder.",
+  "storage": {
+    "configuration": {
+      "type": "polybox",
+      "provider": "shared",
+      "public_link": "https://polybox.ethz.ch/index.php/s/6EsHI6MF83mg52o"
+    },
+    "source_path": "/",
+    "target_path": "/zurich-air-quality-data",
+    "readonly": true
+  }
+}
