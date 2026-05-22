@@ -13,7 +13,9 @@
   },
   "network": {
     "allowedDomains": [
-      "renkulab.io"
+      "renkulab.io",
+      "dev.renku.ch",
+      "github.com"
     ],
     "deniedDomains": []
   }
