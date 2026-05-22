@@ -11,7 +11,7 @@
     "renkulab",
     "data-science"
   ],
-  "license": "UNLICENSED",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/OWNER/pi-renku-skill.git"
@@ -24,6 +24,7 @@
   "files": [
     "skills/",
     "README.md",
+    "LICENSE",
     "package.json"
   ],
   "scripts": {

@@ -333,6 +333,41 @@ def try_rnk() -> Optional[str]:
     return None
 
 
+def access_token_for_subprocess() -> Optional[str]:
+    env = token_from_env()
+    if env:
+        return env
+    rnk_tok = load_rnk_token()
+    if rnk_tok:
+        return rnk_tok["tokens"].get("access_token")
+    inst = get_instance_creds()
+    if inst:
+        return (inst.get("tokens") or {}).get("access_token")
+    return None
+
+
+def run_rnk(args: list[str]) -> tuple[int, str, str]:
+    exe = try_rnk()
+    if not exe:
+        return 127, "", "rnk not found"
+    assert_not_admin()
+    env = os.environ.copy()
+    env["RENKU_CLI_RENKU_URL"] = base_url()
+    token = access_token_for_subprocess()
+    if token:
+        env["RENKU_CLI_ACCESS_TOKEN"] = token
+    cmd = [exe, "--renku-url", base_url(), "--format", "json", *args]
+    proc = subprocess.run(cmd, text=True, capture_output=True, env=env)
+    return proc.returncode, proc.stdout, proc.stderr
+
+
+def maybe_json(text: str) -> Any:
+    try:
+        return json.loads(text)
+    except Exception:
+        return {"output": text.strip()}
+
+
 def auth_state_path(base: str) -> Path:
     safe = base.replace("https://", "").replace("http://", "").replace("/", "_")
     return STATE_DIR / f"device-{safe}.json"
@@ -680,6 +715,21 @@ def add_iframe_url(session: dict[str, Any]) -> dict[str, Any]:
 
 
 def cmd_session_launch(args: argparse.Namespace) -> None:
+    use_rnk = getattr(args, "backend", "api") in {"auto", "rnk"} and getattr(args, "type", "interactive") == "non-interactive" and args.disk_storage is None and args.resource_class_id is None
+    if use_rnk:
+        if args.dry_run:
+            print_out({"rnk": ["job", "start", args.launcher]}, args); return
+        rc, out, err = run_rnk(["job", "start", args.launcher])
+        if rc == 0:
+            data = maybe_json(out)
+            if isinstance(data, dict):
+                data = add_iframe_url(data)
+            print_out(data, args, f"Started job with rnk from launcher {args.launcher}")
+            return
+        if getattr(args, "backend", "api") == "rnk":
+            raise RenkuError(f"rnk job start failed: {err.strip() or out.strip()}")
+        if not args.json:
+            print(f"rnk job start failed; falling back to API: {err.strip() or out.strip()}", file=sys.stderr)
     body = {"launcher_id": args.launcher}
     if args.type: body["session_type"] = args.type
     if args.disk_storage is not None: body["disk_storage"] = args.disk_storage
@@ -691,6 +741,16 @@ def cmd_session_launch(args: argparse.Namespace) -> None:
 
 
 def cmd_session_list(args: argparse.Namespace) -> None:
+    use_rnk = getattr(args, "backend", "api") in {"auto", "rnk"} and getattr(args, "type", "interactive") == "non-interactive"
+    if use_rnk:
+        rc, out, err = run_rnk(["job", "list"])
+        if rc == 0:
+            print_out(maybe_json(out), args)
+            return
+        if getattr(args, "backend", "api") == "rnk":
+            raise RenkuError(f"rnk job list failed: {err.strip() or out.strip()}")
+        if not args.json:
+            print(f"rnk job list failed; falling back to API: {err.strip() or out.strip()}", file=sys.stderr)
     print_out(http_json("GET", "/sessions", query={"session_type": args.type}), args)
 
 
@@ -699,11 +759,33 @@ def cmd_session_get(args: argparse.Namespace) -> None:
 
 
 def cmd_session_logs(args: argparse.Namespace) -> None:
+    use_rnk = getattr(args, "backend", "api") in {"auto", "rnk"} and getattr(args, "job", False)
+    if use_rnk:
+        rc, out, err = run_rnk(["job", "logs", args.session])
+        if rc == 0:
+            print_out(maybe_json(out), args)
+            return
+        if getattr(args, "backend", "api") == "rnk":
+            raise RenkuError(f"rnk job logs failed: {err.strip() or out.strip()}")
+        if not args.json:
+            print(f"rnk job logs failed; falling back to API: {err.strip() or out.strip()}", file=sys.stderr)
     print_out(http_json("GET", f"/sessions/{args.session}/logs"), args)
 
 
 def cmd_session_delete(args: argparse.Namespace) -> None:
     confirm(args, f"Stop/delete session {args.session}?")
+    use_rnk = getattr(args, "backend", "api") in {"auto", "rnk"} and getattr(args, "job", False)
+    if use_rnk:
+        if args.dry_run:
+            print_out({"rnk": ["job", "stop", args.session]}, args); return
+        rc, out, err = run_rnk(["job", "stop", args.session])
+        if rc == 0:
+            print_out(maybe_json(out) if out.strip() else {"status": "stopped", "job": args.session}, args)
+            return
+        if getattr(args, "backend", "api") == "rnk":
+            raise RenkuError(f"rnk job stop failed: {err.strip() or out.strip()}")
+        if not args.json:
+            print(f"rnk job stop failed; falling back to API delete: {err.strip() or out.strip()}", file=sys.stderr)
     print_out(http_json("DELETE", f"/sessions/{args.session}"), args, "Session deleted")
 
 
@@ -830,8 +912,10 @@ def main(argv=None) -> int:
     q=sp.add_parser("wait"); q.add_argument("session"); q.add_argument("--timeout", type=int, default=900); q.add_argument("--interval", type=int, default=10); q.add_argument("--logs", action="store_true"); q.add_argument("--log-lines", type=int, default=5); q.add_argument("--verbose", action="store_true"); q.set_defaults(func=cmd_session_wait)
 
     p=sub.add_parser("job"); sp=p.add_subparsers(dest="job_cmd", required=True)
-    q=sp.add_parser("run"); q.add_argument("--launcher", required=True); q.add_argument("--disk-storage", type=int); q.add_argument("--resource-class-id", type=int); q.set_defaults(type="non-interactive", func=cmd_session_launch)
-    q=sp.add_parser("list"); q.set_defaults(type="non-interactive", func=cmd_session_list)
+    q=sp.add_parser("run"); q.add_argument("--launcher", required=True); q.add_argument("--disk-storage", type=int); q.add_argument("--resource-class-id", type=int); q.add_argument("--backend", choices=["auto","api","rnk"], default="auto", help="auto tries rnk for simple job starts, then falls back to API"); q.set_defaults(type="non-interactive", func=cmd_session_launch)
+    q=sp.add_parser("list"); q.add_argument("--backend", choices=["auto","api","rnk"], default="auto"); q.set_defaults(type="non-interactive", func=cmd_session_list)
+    q=sp.add_parser("logs"); q.add_argument("session"); q.add_argument("--backend", choices=["auto","api","rnk"], default="auto"); q.set_defaults(func=cmd_session_logs, job=True)
+    q=sp.add_parser("stop"); q.add_argument("session"); q.add_argument("--backend", choices=["auto","api","rnk"], default="auto"); q.set_defaults(func=cmd_session_delete, job=True)
     q=sp.add_parser("wait"); q.add_argument("session"); q.add_argument("--timeout", type=int, default=900); q.add_argument("--interval", type=int, default=10); q.add_argument("--logs", action="store_true", default=True); q.add_argument("--log-lines", type=int, default=8); q.add_argument("--verbose", action="store_true"); q.set_defaults(func=cmd_session_wait, wait_for_job=True)
 
     args = root.parse_args(argv)

@@ -23,7 +23,7 @@ Default instance is `https://renkulab.io`. Override with:
 export RENKU_BASE_URL=https://dev.renku.ch
 ```
 
-The helper is dependency-free Python stdlib. It checks for the official Renku CLI as `rnk` and reports it in `doctor`; workflow commands currently use the Data Services API directly and are designed so they can delegate to `rnk` later.
+The helper is dependency-free Python stdlib. It checks for the official Renku CLI as `rnk` and reports it in `doctor`. `rnk` is used for authentication (`rnk login`) and token import/reuse. Job commands (`job run/list/logs/stop`) support `--backend auto|api|rnk`; `auto` tries `rnk job start/list/logs/stop` for simple job operations and falls back to the API if `rnk` fails or does not support the requested options. Project, connector, launcher, and session workflows mostly use the Renku Data Services API directly. The helper keeps API-based job commands for richer agent behavior such as waiting for terminal states, removing failed job sessions before rerun, URL enrichment, and workflows not yet covered by `rnk`.
 
 ## Authentication
 

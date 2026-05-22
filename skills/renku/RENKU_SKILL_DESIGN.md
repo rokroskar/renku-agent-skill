@@ -106,7 +106,9 @@ Design principle:
 
 > Prefer the official `renku-cli` when it supports a workflow reliably; otherwise use the bundled helper. Keep the bundled helper as a compatibility adapter so it can delegate to official CLI commands later.
 
-The skill/helper should try to use `renku-cli` where appropriate. If it is not available locally, the skill may offer to download the latest suitable binary from the GitHub releases page and cache it under the skill/config directory. Downloading or executing a binary should require explicit user approval unless the user has configured an opt-in setting.
+Current implementation status: the helper uses `rnk` only for authentication (`rnk login`) and token import/reuse. Project, data connector, launcher, environment, session, and job workflows currently use the Renku Data Services API directly. However, job management is an important candidate for CLI delegation because `rnk` supports `job start`, `job list`, `job logs`, and `job stop`. The helper should keep API-based job functionality for richer agent behavior such as `job wait`, removing failed job sessions before rerun, URL enrichment, and workflows not yet covered by `rnk`.
+
+The skill/helper may use `renku-cli` for more workflows in the future as CLI support matures. If it is not available locally, the skill may offer to download the latest suitable binary from the GitHub releases page and cache it under the skill/config directory. Downloading or executing a binary should require explicit user approval unless the user has configured an opt-in setting.
 
 Suggested CLI acquisition behavior:
 
@@ -115,9 +117,9 @@ Suggested CLI acquisition behavior:
 3. Check a skill-managed cache directory, e.g. `~/.config/pi-renku-skill/bin/`.
 4. If missing, inspect GitHub releases and offer to download the latest binary matching the current OS/architecture.
 5. Verify basic executability with a version/help command such as `rnk --version` or `rnk --help`.
-6. Prefer invoking the official CLI for supported operations; fall back to direct API calls for unsupported workflows or when the CLI fails in a known unsupported way.
+6. For now, invoke the official CLI for login/token handling. Consider using `rnk job start/list/logs/stop` for simple job operations, while keeping direct API calls for richer job/session workflows and other operations until `rnk` supports them reliably.
 
-The Python helper remains the stable interface used by the skill, so the underlying implementation can switch between official CLI delegation and direct API calls without changing agent workflows.
+The Python helper remains the stable interface used by the skill, so the underlying implementation can later switch between official CLI delegation and direct API calls without changing agent workflows.
 
 ## Optional pi Extension
 

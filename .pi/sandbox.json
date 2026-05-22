@@ -10,7 +10,8 @@
     "denyRead": [],
     "allowWrite": [
       ".",
-      "/tmp/patch-out.json"
+      "/tmp/patch-out.json",
+      "/tmp/rnkout"
     ],
     "denyWrite": []
   },
