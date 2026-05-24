@@ -21,6 +21,29 @@ Global flags may be placed before or after subcommands:
 --yes       skip confirmation only after user approved
 ```
 
+## Choosing resource classes
+
+Before launching sessions or jobs with non-default compute, inspect available resource pools/classes:
+
+```bash
+python3 scripts/renku_agent.py resource-pools --json
+python3 scripts/renku_agent.py resource-classes --json
+```
+
+Use a class with `matching: true`. For GPU jobs, choose a class with `gpu > 0` and check its `name`, `node_affinities`, and `tolerations` for the requested accelerator type.
+
+Example decision process for “use an A100 slice”:
+
+1. List resource pools/classes.
+2. Filter to `matching: true` and `gpu > 0`.
+3. Prefer names like `A100`, `GPU - A100 20GB vRAM`, or affinities/tolerations mentioning A100/GPU partitioning.
+4. Tell the user which class will be used, including id, CPU, memory, GPU, and storage limits.
+5. Launch with:
+
+```bash
+python3 scripts/renku_agent.py job run --launcher <launcher-id> --resource-class-id <class-id>
+```
+
 ## Project with repository
 
 ```bash
@@ -85,6 +108,15 @@ Then:
 ```bash
 python3 scripts/renku_agent.py launcher create --body launcher.json
 ```
+
+Build-from-code launcher creation starts an image build. Use `build wait` rather than writing custom polling loops:
+
+```bash
+python3 scripts/renku_agent.py build list --environment <environment-id>
+python3 scripts/renku_agent.py build wait <build-id> --timeout 1800 --interval 15
+```
+
+`build wait` prints concise log progress by default so the user can see whether Renku is cloning the repository, resolving/installing dependencies, exporting the image, or pushing the final image.
 
 For R projects, use `builder_variant: "r"` and `frontend_variant: "rstudio"` when available. Other Python frontends may include `vscodium` and `ttyd`.
 

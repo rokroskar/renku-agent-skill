@@ -26,7 +26,7 @@ The skill is workflow-first: it helps agents authenticate, inspect account/platf
 From a git repository:
 
 ```bash
-pi install git:github.com/OWNER/pi-renku-skill
+pi install git:github.com/rokroskar/pi-renku-skill
 ```
 
 Or from a local checkout:
@@ -161,7 +161,7 @@ Expected agent behavior:
 
 - Create a project with the repo in `repositories`.
 - Create a build-from-code launcher.
-- Watch the image build until it succeeds.
+- Use `build wait <build-id>` to watch the image build until it succeeds; the agent should report concise log progress so you can see whether Renku is cloning the repository, installing dependencies, exporting the image, or pushing the final image.
 - Give you the Renku project/session iframe URL when launching an interactive session, not just the raw backend session URL.
 
 ### 3. Run notebooks as a non-interactive job
@@ -176,6 +176,7 @@ use the CNB lifecycle launcher, and run the notebooks as a non-interactive Renku
 
 Expected agent behavior:
 
+- If the user asks for non-default compute such as a GPU/A100, inspect `resource-pools --json`, choose an accessible class with `matching: true` and `gpu > 0`, and report the selected resource class ID/name before launch.
 - Get the successful build image from the launcher environment.
 - Patch or create a launcher using:
   - `environment_image_source: image`

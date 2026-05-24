@@ -78,6 +78,16 @@ python3 scripts/renku_agent.py resource-pools
 python3 scripts/renku_agent.py resource-classes
 ```
 
+Before launching sessions/jobs with non-default compute, inspect available resource pools/classes. Use classes where `matching: true`; these are accessible/schedulable for the current user and requested filters. For GPU jobs, look for classes with `gpu > 0` and names/affinities/tolerations indicating the desired GPU type, e.g. A10 or A100. Pass the selected class as `--resource-class-id <id>` to `session launch` or `job run`.
+
+If the user asks for a specific accelerator such as an A100 slice:
+
+1. Run `resource-pools --json`.
+2. Find accessible (`matching: true`) classes with `gpu > 0`.
+3. Prefer a class whose `name`, `node_affinities`, or `tolerations` mention the requested accelerator.
+4. Report the selected class name/id/resources before launching.
+5. Use `job run --resource-class-id <id>` or `session launch --resource-class-id <id>`.
+
 ### Projects
 
 ```bash
@@ -179,7 +189,10 @@ python3 scripts/renku_agent.py build list --environment <environment-id>
 python3 scripts/renku_agent.py build start --environment <environment-id>
 python3 scripts/renku_agent.py build get <build-id>
 python3 scripts/renku_agent.py build logs <build-id>
+python3 scripts/renku_agent.py build wait <build-id>
 ```
+
+Use `build wait <build-id>` instead of writing ad-hoc polling loops. It polls the build status, prints concise build-log progress by default, and exits when the build reaches `succeeded`, `failed`, or `error`. This is preferred when users are waiting for build-from-code images because it reports what is happening, e.g. repository clone, dependency resolution, package installation, image export/push.
 
 ### Sessions and Non-interactive Jobs
 

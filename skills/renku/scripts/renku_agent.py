@@ -714,6 +714,56 @@ def add_iframe_url(session: dict[str, Any]) -> dict[str, Any]:
     return session
 
 
+def extract_build_progress(logs: Any, lines: int = 8) -> str:
+    if isinstance(logs, dict):
+        # Prefer the actual build step, then include other steps if needed.
+        ordered = []
+        for key in ("step-build-and-push", "step-source-default", "prepare"):
+            if key in logs:
+                ordered.append(str(logs[key]))
+        for key, value in logs.items():
+            if key not in {"step-build-and-push", "step-source-default", "prepare"}:
+                ordered.append(str(value))
+        text = "\n".join(ordered)
+    else:
+        text = str(logs)
+    useful = []
+    noisy_prefixes = ("Downloading ", "Collecting ")
+    for ln in text.splitlines():
+        s = ln.strip()
+        if not s:
+            continue
+        useful.append(s)
+    return "\n".join(useful[-lines:])
+
+
+def cmd_build_wait(args: argparse.Namespace) -> None:
+    terminal = {"succeeded", "failed", "error"}
+    success = {"succeeded"}
+    end = time.time() + args.timeout
+    last_status = None
+    build: dict[str, Any] = {}
+    while time.time() < end:
+        build = http_json("GET", f"/builds/{args.build}")
+        status = build.get("status", "unknown")
+        if not args.json and (args.verbose or status != last_status):
+            print(f"build {args.build}: {status}")
+        if args.logs:
+            try:
+                tail = extract_build_progress(http_json("GET", f"/builds/{args.build}/logs"), args.log_lines)
+                if tail and not args.json:
+                    print(tail)
+            except Exception as e:
+                if args.verbose and not args.json:
+                    print(f"build logs unavailable: {e}")
+        if status in terminal:
+            print_out(build, args)
+            return
+        last_status = status
+        time.sleep(args.interval)
+    raise RenkuError(f"Timed out waiting for build {args.build}")
+
+
 def cmd_session_launch(args: argparse.Namespace) -> None:
     use_rnk = getattr(args, "backend", "api") in {"auto", "rnk"} and getattr(args, "type", "interactive") == "non-interactive" and args.disk_storage is None and args.resource_class_id is None
     if use_rnk:
@@ -902,6 +952,7 @@ def main(argv=None) -> int:
     q=sp.add_parser("start"); q.add_argument("--environment", required=True); q.set_defaults(func=lambda a: print_out(http_json("POST", f"/environments/{a.environment}/builds"), a))
     q=sp.add_parser("get"); q.add_argument("build"); q.set_defaults(func=lambda a: print_out(http_json("GET", f"/builds/{a.build}"), a))
     q=sp.add_parser("logs"); q.add_argument("build"); q.set_defaults(func=lambda a: print_out(http_json("GET", f"/builds/{a.build}/logs"), a))
+    q=sp.add_parser("wait"); q.add_argument("build"); q.add_argument("--timeout", type=int, default=1800); q.add_argument("--interval", type=int, default=15); q.add_argument("--logs", action="store_true", default=True); q.add_argument("--log-lines", type=int, default=10); q.add_argument("--verbose", action="store_true"); q.set_defaults(func=cmd_build_wait)
 
     p=sub.add_parser("session"); sp=p.add_subparsers(dest="session_cmd", required=True)
     q=sp.add_parser("launch"); q.add_argument("--launcher", required=True); q.add_argument("--type", choices=["interactive","non-interactive"], default="interactive"); q.add_argument("--disk-storage", type=int); q.add_argument("--resource-class-id", type=int); q.set_defaults(func=cmd_session_launch)
