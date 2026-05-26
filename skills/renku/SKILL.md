@@ -41,7 +41,7 @@ python3 scripts/renku_agent.py auth logout
 
 For agent-mediated login, prefer `auth login --method device --user-code-only`, show the URL/code to the user, then run `auth complete` after the user says they approved it. This avoids long-running polling commands.
 
-When `rnk login` succeeds, the helper attempts to import the `rnk` token for direct API calls. The helper also reads valid `rnk` tokens directly when available. Helper credentials are stored under `~/.config/pi-renku-skill/credentials.json` when writable; if that is sandbox-blocked, it automatically falls back to project-local `.pi/renku-config/`. Environment token fallback is supported:
+When `rnk login` succeeds, the helper attempts to import the `rnk` token for direct API calls. The helper also reads valid `rnk` tokens directly when available. Helper credentials are stored under `~/.config/renku-agent-skill/credentials.json` when writable; if that is sandbox-blocked, it automatically falls back to project-local `.pi/renku-config/`. Environment token fallback is supported:
 
 ```bash
 RENKU_ACCESS_TOKEN=... python3 scripts/renku_agent.py user

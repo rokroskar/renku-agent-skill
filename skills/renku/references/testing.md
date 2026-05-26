@@ -22,7 +22,7 @@ python3 scripts/renku_agent.py connector list
 Write tests must be explicitly requested/confirmed. Suggested temporary resource prefix:
 
 ```text
-pi-renku-skill-test-YYYYMMDD-HHMMSS
+renku-agent-skill-test-YYYYMMDD-HHMMSS
 ```
 
 Never run write tests against `https://renkulab.io` unless the user explicitly asks.

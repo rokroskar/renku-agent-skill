@@ -6,7 +6,7 @@ The helper prefers the official Renku CLI (`rnk login`) by default, then falls b
 - Override: `RENKU_BASE_URL=https://dev.renku.ch`
 - Client ID: `renku-cli`
 - Public client, no client secret
-- Helper credentials: `~/.config/pi-renku-skill/credentials.json`
+- Helper credentials: `~/.config/renku-agent-skill/credentials.json`
 - Official CLI command: `rnk`
 
 Login:

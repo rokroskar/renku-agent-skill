@@ -41,7 +41,7 @@ def find_project_root(start: Optional[Path] = None) -> Optional[Path]:
 def choose_config_dir() -> Path:
     if os.environ.get("RENKU_SKILL_CONFIG_DIR"):
         return Path(os.environ["RENKU_SKILL_CONFIG_DIR"]).expanduser()
-    preferred = Path.home() / ".config" / "pi-renku-skill"
+    preferred = Path.home() / ".config" / "renku-agent-skill"
     try:
         preferred.mkdir(parents=True, exist_ok=True)
         probe = preferred / ".write-test"

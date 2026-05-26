@@ -47,7 +47,7 @@ Design decisions:
 - Credential storage: user-level config file
 
 ```text
-~/.config/pi-renku-skill/credentials.json
+~/.config/renku-agent-skill/credentials.json
 ```
 
 - Credential file permissions should be restricted, e.g. `0600`.
@@ -114,7 +114,7 @@ Suggested CLI acquisition behavior:
 
 1. Check for an existing `rnk` binary on `PATH` first. The official `renku-cli` typically installs as the `rnk` command-line tool.
 2. Optionally also check for `renku` or `renku-cli` aliases/wrappers on `PATH`.
-3. Check a skill-managed cache directory, e.g. `~/.config/pi-renku-skill/bin/`.
+3. Check a skill-managed cache directory, e.g. `~/.config/renku-agent-skill/bin/`.
 4. If missing, inspect GitHub releases and offer to download the latest binary matching the current OS/architecture.
 5. Verify basic executability with a version/help command such as `rnk --version` or `rnk --help`.
 6. For now, invoke the official CLI for login/token handling. Consider using `rnk job start/list/logs/stop` for simple job operations, while keeping direct API calls for richer job/session workflows and other operations until `rnk` supports them reliably.
@@ -416,7 +416,7 @@ It should check:
 Suggested temporary resource naming:
 
 ```text
-pi-renku-skill-test-YYYYMMDD-HHMMSS
+renku-agent-skill-test-YYYYMMDD-HHMMSS
 ```
 
 ## Relevant API Areas

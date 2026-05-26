@@ -1,4 +1,4 @@
-# Pi Renku Skill
+# Renku Agent Skill
 
 A portable Agent Skill for using the [Renku](https://renkulab.io) platform from AI coding agents.
 
@@ -26,13 +26,13 @@ The skill is workflow-first: it helps agents authenticate, inspect account/platf
 From a git repository:
 
 ```bash
-pi install git:github.com/rokroskar/pi-renku-skill
+pi install git:github.com/rokroskar/renku-agent-skill
 ```
 
 Or from a local checkout:
 
 ```bash
-pi install /path/to/pi-renku-skill
+pi install /path/to/renku-agent-skill
 ```
 
 Then reload pi or start a new session. The skill should be available as:
@@ -40,6 +40,78 @@ Then reload pi or start a new session. The skill should be available as:
 ```text
 /skill:renku
 ```
+
+## Install in Claude Code
+
+Claude Code discovers skills from per-skill folders containing a `SKILL.md` file. Install globally for your user:
+
+```bash
+git clone https://github.com/rokroskar/renku-agent-skill.git
+mkdir -p ~/.claude/skills
+cp -R renku-agent-skill/skills/renku ~/.claude/skills/renku
+```
+
+Or install only for one project by copying the skill into that project's Claude directory:
+
+```bash
+mkdir -p .claude/skills
+cp -R /path/to/renku-agent-skill/skills/renku .claude/skills/renku
+```
+
+Restart Claude Code or start a new session. The skill should be available as:
+
+```text
+/skill:renku
+```
+
+## Install in Codex CLI
+
+Codex uses `AGENTS.md` files for persistent instructions. Clone the package somewhere stable, then add a short instruction file that tells Codex where the skill lives.
+
+Global setup:
+
+```bash
+git clone https://github.com/rokroskar/renku-agent-skill.git ~/.codex/renku-agent-skill
+cat >> ~/.codex/AGENTS.md <<'EOF'
+
+## Renku Agent Skill
+When asked to work with Renku/RenkuLab projects, data connectors, launchers, sessions, or jobs, use the Agent Skill at:
+~/.codex/renku-agent-skill/skills/renku/SKILL.md
+Read that SKILL.md first, then use its helper script and references as instructed.
+EOF
+```
+
+Project-local setup:
+
+```bash
+git clone https://github.com/rokroskar/renku-agent-skill.git .agent-skills/renku-agent-skill
+cat >> AGENTS.md <<'EOF'
+
+## Renku Agent Skill
+When asked to work with Renku/RenkuLab projects, data connectors, launchers, sessions, or jobs, use the Agent Skill at:
+.agent-skills/renku-agent-skill/skills/renku/SKILL.md
+Read that SKILL.md first, then use its helper script and references as instructed.
+EOF
+```
+
+Start a new Codex session after adding or changing `AGENTS.md`.
+
+## Install in opencode
+
+opencode also reads project rules from `AGENTS.md`. Clone the package into your project and reference the skill from `AGENTS.md`:
+
+```bash
+git clone https://github.com/rokroskar/renku-agent-skill.git .agent-skills/renku-agent-skill
+cat >> AGENTS.md <<'EOF'
+
+## Renku Agent Skill
+When asked to work with Renku/RenkuLab projects, data connectors, launchers, sessions, or jobs, use the Agent Skill at:
+.agent-skills/renku-agent-skill/skills/renku/SKILL.md
+Read that SKILL.md first, then use its helper script and references as instructed.
+EOF
+```
+
+If you prefer opencode-specific rules, put the same block in `.opencode/AGENTS.md` instead.
 
 ## Install in other Agent Skills-compatible agents
 
@@ -70,7 +142,7 @@ For production RenkuLab, omit `RENKU_BASE_URL` or set:
 export RENKU_BASE_URL=https://renkulab.io
 ```
 
-If the environment cannot write to `~/.config/pi-renku-skill`, the helper falls back to a local `.pi/renku-config` directory when used inside a pi project.
+If the environment cannot write to `~/.config/renku-agent-skill`, the helper falls back to a local `.pi/renku-config` directory when used inside a pi project.
 
 ## Common commands
 
