@@ -141,8 +141,6 @@ python3 scripts/renku_agent.py session logs <session-id>
 
 This wraps `POST /sessions` with `session_type: non-interactive`.
 
-The official `rnk` CLI also supports basic job operations (`rnk job start`, `rnk job list`, `rnk job logs`, `rnk job stop`). The helper's job commands support `--backend auto|api|rnk`; `auto` tries `rnk` for simple operations and falls back to API. Prefer API-backed helper behavior when the agent needs richer behavior such as waiting for terminal states, cleaning up failed job sessions before rerun, or correlating jobs with project/session metadata.
-
 Use `job wait` rather than writing custom polling loops. It polls status, prints concise log tails, and exits when the job reaches a terminal state:
 
 ```bash

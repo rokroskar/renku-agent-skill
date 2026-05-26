@@ -23,7 +23,7 @@ Default instance is `https://renkulab.io`. Override with:
 export RENKU_BASE_URL=https://dev.renku.ch
 ```
 
-The helper is dependency-free Python stdlib. It checks for the official Renku CLI as `rnk` and reports it in `doctor`. `rnk` is used for authentication (`rnk login`) and token import/reuse. Job commands (`job run/list/logs/stop`) support `--backend auto|api|rnk`; `auto` tries `rnk job start/list/logs/stop` for simple job operations and falls back to the API if `rnk` fails or does not support the requested options. Project, connector, launcher, and session workflows mostly use the Renku Data Services API directly. The helper keeps API-based job commands for richer agent behavior such as waiting for terminal states, removing failed job sessions before rerun, URL enrichment, and workflows not yet covered by `rnk`.
+The helper is dependency-free Python stdlib. It checks for the official Renku CLI as `rnk` and reports it in `doctor`. `rnk` is used for authentication (`rnk login`) and token import/reuse. All other operations — projects, connectors, launchers, sessions, and jobs — use the Renku Data Services API directly, giving richer behavior such as waiting for terminal states, removing failed job sessions before rerun, and URL enrichment.
 
 ## Authentication
 
@@ -229,7 +229,6 @@ Interactive sessions and non-interactive jobs both use `POST /sessions`. Jobs se
 ```bash
 python3 scripts/renku_agent.py session launch --launcher <launcher-id>
 python3 scripts/renku_agent.py session launch --launcher <launcher-id> --type non-interactive
-python3 scripts/renku_agent.py session launch --launcher <launcher-id> --type non-interactive --backend auto  # try rnk first
 python3 scripts/renku_agent.py job run --launcher <launcher-id>
 
 python3 scripts/renku_agent.py session list
