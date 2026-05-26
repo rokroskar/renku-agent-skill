@@ -78,6 +78,14 @@ python3 scripts/renku_agent.py resource-pools
 python3 scripts/renku_agent.py resource-classes
 ```
 
+### Search
+
+```bash
+python3 scripts/renku_agent.py search "my dataset"
+python3 scripts/renku_agent.py search "climate" --type project
+python3 scripts/renku_agent.py search "air quality" --page 2 --per-page 20
+```
+
 Before launching sessions/jobs with non-default compute, inspect available resource pools/classes. Use classes where `matching: true`; these are accessible/schedulable for the current user and requested filters. For GPU jobs, look for classes with `gpu > 0` and names/affinities/tolerations indicating the desired GPU type, e.g. A10 or A100. Pass the selected class as `--resource-class-id <id>` to `session launch` or `job run`.
 
 If the user asks for a specific accelerator such as an A100 slice:
@@ -101,10 +109,21 @@ Add repositories as project-level assets:
 ```bash
 python3 scripts/renku_agent.py project repo list --project <project-id>
 python3 scripts/renku_agent.py project repo add --project <project-id> --url https://github.com/org/repo.git
+python3 scripts/renku_agent.py project repo add --project <project-id> --url https://github.com/org/repo.git --ref main
 python3 scripts/renku_agent.py project repo remove --project <project-id> --repository https://github.com/org/repo.git
 ```
 
 Repository permissions and credentials are handled by Renku integrations; do not ask the user for raw Git tokens unless they explicitly request a lower-level workaround.
+
+Manage project members:
+
+```bash
+python3 scripts/renku_agent.py project members list --project <project-id>
+python3 scripts/renku_agent.py project members add --project <project-id> --user <user-id> --role owner|editor|viewer
+python3 scripts/renku_agent.py project members remove --project <project-id> --user <user-id>
+```
+
+Adding/removing members always requires explicit confirmation.
 
 ### Data Connectors
 
@@ -119,15 +138,24 @@ Create supported P0 connector types:
 
 ```bash
 # DOI / Zenodo / Dataverse global connector
-python3 scripts/renku_agent.py connector create doi --name "Dataset" --doi "10.xxxx/..." --target-path /data --global
+python3 scripts/renku_agent.py connector create doi --name "Dataset" --doi "10.xxxx/..." --target-path data --global
 
-# S3/S3-compatible; prompts for secrets
-python3 scripts/renku_agent.py connector create s3 --name "S3 Data" --bucket my-bucket --endpoint https://s3.example.org --target-path /data
+# S3/S3-compatible; prompts for secrets interactively, or set RENKU_S3_ACCESS_KEY_ID / RENKU_S3_SECRET_ACCESS_KEY
+python3 scripts/renku_agent.py connector create s3 --name "S3 Data" --bucket my-bucket --endpoint https://s3.example.org --target-path data
+# Non-interactive:
+RENKU_S3_ACCESS_KEY_ID=... RENKU_S3_SECRET_ACCESS_KEY=... python3 scripts/renku_agent.py connector create s3 ...
+# Writable S3 connector:
+python3 scripts/renku_agent.py connector create s3 --name "Output" --bucket out-bucket --endpoint ... --no-readonly
 
-# Polybox / SWITCHdrive personal or shared; prompts for secrets when needed
+# Polybox / SWITCHdrive personal or shared
 # target paths are relative to the session working directory: use data, not /data
+# Secrets: --password flag or RENKU_CONNECTOR_PASSWORD env var; username via --username or RENKU_CONNECTOR_USERNAME
 python3 scripts/renku_agent.py connector create polybox --name "Polybox" --access personal --target-path data
 python3 scripts/renku_agent.py connector create switchdrive --name "Shared SWITCHdrive" --access shared --url <public-link> --target-path data
+
+# Generic WebDAV
+# URL via --url or RENKU_CONNECTOR_URL; credentials via --username/--password or RENKU_CONNECTOR_USERNAME/RENKU_CONNECTOR_PASSWORD
+python3 scripts/renku_agent.py connector create webdav --name "WebDAV Store" --url https://dav.example.org --target-path data
 ```
 
 For exact payload control, use `--body FILE` or `--payload JSON`.
@@ -201,9 +229,11 @@ Interactive sessions and non-interactive jobs both use `POST /sessions`. Jobs se
 ```bash
 python3 scripts/renku_agent.py session launch --launcher <launcher-id>
 python3 scripts/renku_agent.py session launch --launcher <launcher-id> --type non-interactive
+python3 scripts/renku_agent.py session launch --launcher <launcher-id> --type non-interactive --backend auto  # try rnk first
 python3 scripts/renku_agent.py job run --launcher <launcher-id>
 
 python3 scripts/renku_agent.py session list
+python3 scripts/renku_agent.py session list --page 2 --per-page 20
 python3 scripts/renku_agent.py job list
 python3 scripts/renku_agent.py session get <session-id>
 python3 scripts/renku_agent.py session logs <session-id>

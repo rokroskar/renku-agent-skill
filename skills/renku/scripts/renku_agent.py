@@ -254,17 +254,24 @@ def admin_check_enabled() -> bool:
     return os.environ.get("RENKU_ALLOW_ADMIN", "").lower() not in {"1", "true", "yes"}
 
 
+_admin_check_cache: Optional[bool] = None
+
+
 def assert_not_admin() -> None:
+    global _admin_check_cache
     if not admin_check_enabled():
+        return
+    if _admin_check_cache is False:
         return
     try:
         user = http_json("GET", "/user", auth=True, skip_admin_check=True)
         if isinstance(user, dict) and user.get("is_admin") is True:
+            _admin_check_cache = True
             raise RenkuError("Refusing to operate on Renku while authenticated as an admin user. Run auth logout and log in with a non-admin account.")
+        _admin_check_cache = False
     except RenkuError:
         raise
     except Exception:
-        # If user status cannot be determined, continue and let the original request surface auth/API errors.
         return
 
 
@@ -551,6 +558,10 @@ def cmd_classes(args: argparse.Namespace) -> None:
     print_out(data, args)
 
 
+def cmd_search(args: argparse.Namespace) -> None:
+    print_out(http_json("GET", "/search/query", query={"q": args.query, "type": getattr(args, "type", None), "page": getattr(args, "page", None), "per_page": getattr(args, "per_page", None)}), args)
+
+
 def cmd_project_list(args: argparse.Namespace) -> None:
     print_out(http_json("GET", "/projects", query={"name": args.search, "page": args.page, "per_page": args.per_page}), args)
 
@@ -596,8 +607,9 @@ def cmd_project_repo_list(args: argparse.Namespace) -> None:
 def cmd_project_repo_add(args: argparse.Namespace) -> None:
     proj = http_json("GET", f"/projects/{args.project}")
     repos = list(proj.get("repositories") or [])
-    if args.url not in repos:
-        repos.append(args.url)
+    url = args.url + (f"#{args.ref}" if getattr(args, "ref", None) else "")
+    if url not in repos:
+        repos.append(url)
     body = {"repositories": repos}
     if args.dry_run:
         print_out({"PATCH": f"/projects/{args.project}", "body": body}, args); return
@@ -616,23 +628,76 @@ def cmd_project_repo_remove(args: argparse.Namespace) -> None:
     print_out(data, args, f"Removed repository from project {args.project}")
 
 
+def cmd_project_members_list(args: argparse.Namespace) -> None:
+    print_out(http_json("GET", f"/projects/{args.project}/members"), args)
+
+
+def cmd_project_members_add(args: argparse.Namespace) -> None:
+    confirm(args, f"Add/update user {args.user} as {args.role} in project {args.project}?")
+    body = {"id": args.user, "role": args.role}
+    if args.dry_run:
+        print_out({"POST": f"/projects/{args.project}/members", "body": body}, args); return
+    print_out(http_json("POST", f"/projects/{args.project}/members", body), args)
+
+
+def cmd_project_members_remove(args: argparse.Namespace) -> None:
+    confirm(args, f"Remove user {args.user} from project {args.project}?")
+    if args.dry_run:
+        print_out({"DELETE": f"/projects/{args.project}/members/{args.user}"}, args); return
+    print_out(http_json("DELETE", f"/projects/{args.project}/members/{args.user}"), args, "Member removed")
+
+
+def _prompt_input(prompt: str, env_var: str, arg_val: Optional[str] = None) -> str:
+    if arg_val is not None:
+        return arg_val
+    env = os.environ.get(env_var)
+    if env is not None:
+        return env
+    if not sys.stdin.isatty():
+        raise RenkuError(f"Input required but stdin is not a TTY; set {env_var} or use --body/--payload")
+    return input(prompt)
+
+
+def _prompt_secret(prompt: str, env_var: str, arg_val: Optional[str] = None) -> str:
+    if arg_val is not None:
+        return arg_val
+    env = os.environ.get(env_var)
+    if env is not None:
+        return env
+    if not sys.stdin.isatty():
+        raise RenkuError(f"Secret required but stdin is not a TTY; set {env_var} or use --body/--payload")
+    return getpass.getpass(prompt)
+
+
 def connector_storage(args: argparse.Namespace) -> dict[str, Any]:
     target = args.target_path
     if args.kind in ("doi", "zenodo", "dataverse"):
         return {"storage_url": args.doi or args.url, "target_path": target, "readonly": True}
     if args.kind == "s3":
-        cfg = {"type": "s3", "provider": args.provider or "Other", "endpoint": args.endpoint or "", "access_key_id": input("S3 access key id: "), "secret_access_key": getpass.getpass("S3 secret access key: ")}
+        access_key = _prompt_input("S3 access key id: ", "RENKU_S3_ACCESS_KEY_ID", getattr(args, "access_key_id", None))
+        secret_key = _prompt_secret("S3 secret access key: ", "RENKU_S3_SECRET_ACCESS_KEY", getattr(args, "secret_access_key", None))
+        cfg = {"type": "s3", "provider": args.provider or "Other", "endpoint": args.endpoint or "", "access_key_id": access_key, "secret_access_key": secret_key}
         return {"configuration": cfg, "source_path": args.source_path or args.bucket or "/", "target_path": target, "readonly": args.readonly}
     if args.kind in ("polybox", "switchdrive"):
         cfg = {"type": args.kind, "provider": args.access}
         if args.access == "shared":
-            cfg["url"] = args.url or input("Public/share link: ")
-            pw = getpass.getpass("Share password (leave empty if none): ")
-            if pw: cfg["pass"] = pw
+            cfg["url"] = _prompt_input("Public/share link: ", "RENKU_CONNECTOR_URL", args.url)
+            pw = getattr(args, "password", None) or os.environ.get("RENKU_CONNECTOR_PASSWORD") or (
+                getpass.getpass("Share password (leave empty if none): ") if sys.stdin.isatty() else ""
+            )
+            if pw:
+                cfg["pass"] = pw
         else:
-            cfg["user"] = args.username or input("Username: ")
-            cfg["pass"] = getpass.getpass("Password/token: ")
-            if args.url: cfg["url"] = args.url
+            cfg["user"] = _prompt_input("Username: ", "RENKU_CONNECTOR_USERNAME", args.username)
+            cfg["pass"] = _prompt_secret("Password/token: ", "RENKU_CONNECTOR_PASSWORD", getattr(args, "password", None))
+            if args.url:
+                cfg["url"] = args.url
+        return {"configuration": cfg, "source_path": args.source_path or "/", "target_path": target, "readonly": args.readonly}
+    if args.kind == "webdav":
+        url = _prompt_input("WebDAV URL: ", "RENKU_CONNECTOR_URL", args.url)
+        user = _prompt_input("Username: ", "RENKU_CONNECTOR_USERNAME", args.username)
+        pw = _prompt_secret("Password/token: ", "RENKU_CONNECTOR_PASSWORD", getattr(args, "password", None))
+        cfg = {"type": "webdav", "url": url, "user": user, "pass": pw}
         return {"configuration": cfg, "source_path": args.source_path or "/", "target_path": target, "readonly": args.readonly}
     raise RenkuError(f"Unsupported connector kind {args.kind}")
 
@@ -731,7 +796,7 @@ def extract_build_progress(logs: Any, lines: int = 8) -> str:
     noisy_prefixes = ("Downloading ", "Collecting ")
     for ln in text.splitlines():
         s = ln.strip()
-        if not s:
+        if not s or any(s.startswith(p) for p in noisy_prefixes):
             continue
         useful.append(s)
     return "\n".join(useful[-lines:])
@@ -801,7 +866,7 @@ def cmd_session_list(args: argparse.Namespace) -> None:
             raise RenkuError(f"rnk job list failed: {err.strip() or out.strip()}")
         if not args.json:
             print(f"rnk job list failed; falling back to API: {err.strip() or out.strip()}", file=sys.stderr)
-    print_out(http_json("GET", "/sessions", query={"session_type": args.type}), args)
+    print_out(http_json("GET", "/sessions", query={"session_type": args.type, "page": getattr(args, "page", None), "per_page": getattr(args, "per_page", None)}), args)
 
 
 def cmd_session_get(args: argparse.Namespace) -> None:
@@ -919,6 +984,7 @@ def main(argv=None) -> int:
     sub.add_parser("namespaces").set_defaults(func=cmd_namespaces)
     sub.add_parser("resource-pools").set_defaults(func=cmd_pools)
     q=sub.add_parser("resource-classes"); q.add_argument("--pool"); q.set_defaults(func=cmd_classes)
+    q=sub.add_parser("search"); q.add_argument("query"); q.add_argument("--type"); q.add_argument("--page", type=int); q.add_argument("--per-page", type=int); q.set_defaults(func=cmd_search)
 
     p=sub.add_parser("project"); sp=p.add_subparsers(dest="project_cmd", required=True)
     q=sp.add_parser("list"); q.add_argument("--search"); q.add_argument("--page", type=int); q.add_argument("--per-page", type=int); q.set_defaults(func=cmd_project_list)
@@ -926,13 +992,17 @@ def main(argv=None) -> int:
     q=sp.add_parser("create"); q.add_argument("--name", required=False); q.add_argument("--namespace"); q.add_argument("--slug"); q.add_argument("--visibility"); q.add_argument("--description"); q.add_argument("--documentation"); q.add_argument("--keyword", action="append"); q.add_argument("--repository", action="append"); q.add_argument("--secrets-mount-directory"); q.add_argument("--body"); q.add_argument("--payload"); q.set_defaults(func=cmd_project_create)
     rp=sp.add_parser("repo"); rsp=rp.add_subparsers(dest="repo_cmd", required=True)
     q=rsp.add_parser("list"); q.add_argument("--project", required=True); q.set_defaults(func=cmd_project_repo_list)
-    q=rsp.add_parser("add"); q.add_argument("--project", required=True); q.add_argument("--url", required=True); q.set_defaults(func=cmd_project_repo_add)
+    q=rsp.add_parser("add"); q.add_argument("--project", required=True); q.add_argument("--url", required=True); q.add_argument("--ref"); q.set_defaults(func=cmd_project_repo_add)
     q=rsp.add_parser("remove"); q.add_argument("--project", required=True); q.add_argument("--repository", required=True); q.set_defaults(func=cmd_project_repo_remove)
+    mp=sp.add_parser("members"); msp=mp.add_subparsers(dest="members_cmd", required=True)
+    q=msp.add_parser("list"); q.add_argument("--project", required=True); q.set_defaults(func=cmd_project_members_list)
+    q=msp.add_parser("add"); q.add_argument("--project", required=True); q.add_argument("--user", required=True); q.add_argument("--role", required=True, choices=["owner","editor","viewer"]); q.set_defaults(func=cmd_project_members_add)
+    q=msp.add_parser("remove"); q.add_argument("--project", required=True); q.add_argument("--user", required=True); q.set_defaults(func=cmd_project_members_remove)
 
     p=sub.add_parser("connector"); sp=p.add_subparsers(dest="connector_cmd", required=True)
     q=sp.add_parser("list"); q.add_argument("--search"); q.add_argument("--page", type=int); q.add_argument("--per-page", type=int); q.set_defaults(func=cmd_connector_list)
     q=sp.add_parser("get"); q.add_argument("connector"); q.set_defaults(func=cmd_connector_get)
-    q=sp.add_parser("create"); q.add_argument("kind", choices=["doi","zenodo","dataverse","s3","polybox","switchdrive"]); q.add_argument("--name"); q.add_argument("--namespace"); q.add_argument("--slug"); q.add_argument("--visibility"); q.add_argument("--description"); q.add_argument("--target-path", default="/data"); q.add_argument("--source-path"); q.add_argument("--doi"); q.add_argument("--url"); q.add_argument("--global", dest="global_connector", action="store_true"); q.add_argument("--bucket"); q.add_argument("--endpoint"); q.add_argument("--provider"); q.add_argument("--readonly", action="store_true", default=True); q.add_argument("--access", choices=["personal","shared"], default="personal"); q.add_argument("--username"); q.add_argument("--body"); q.add_argument("--payload"); q.set_defaults(func=cmd_connector_create)
+    q=sp.add_parser("create"); q.add_argument("kind", choices=["doi","zenodo","dataverse","s3","polybox","switchdrive","webdav"]); q.add_argument("--name"); q.add_argument("--namespace"); q.add_argument("--slug"); q.add_argument("--visibility"); q.add_argument("--description"); q.add_argument("--target-path", default="data"); q.add_argument("--source-path"); q.add_argument("--doi"); q.add_argument("--url"); q.add_argument("--global", dest="global_connector", action="store_true"); q.add_argument("--bucket"); q.add_argument("--endpoint"); q.add_argument("--provider"); q.add_argument("--readonly", action="store_true", default=True); q.add_argument("--no-readonly", dest="readonly", action="store_false"); q.add_argument("--access", choices=["personal","shared"], default="personal"); q.add_argument("--username"); q.add_argument("--password", help="Connector password/token (or set RENKU_CONNECTOR_PASSWORD)"); q.add_argument("--access-key-id", help="S3 access key ID (or set RENKU_S3_ACCESS_KEY_ID)"); q.add_argument("--secret-access-key", help="S3 secret access key (or set RENKU_S3_SECRET_ACCESS_KEY)"); q.add_argument("--body"); q.add_argument("--payload"); q.set_defaults(func=cmd_connector_create)
     q=sp.add_parser("link"); q.add_argument("--connector", required=True); q.add_argument("--project", required=True); q.set_defaults(func=cmd_connector_link)
     q=sp.add_parser("unlink"); q.add_argument("--connector", required=True); q.add_argument("--link", required=True); q.set_defaults(func=cmd_connector_unlink)
 
@@ -955,8 +1025,8 @@ def main(argv=None) -> int:
     q=sp.add_parser("wait"); q.add_argument("build"); q.add_argument("--timeout", type=int, default=1800); q.add_argument("--interval", type=int, default=15); q.add_argument("--logs", action="store_true", default=True); q.add_argument("--log-lines", type=int, default=10); q.add_argument("--verbose", action="store_true"); q.set_defaults(func=cmd_build_wait)
 
     p=sub.add_parser("session"); sp=p.add_subparsers(dest="session_cmd", required=True)
-    q=sp.add_parser("launch"); q.add_argument("--launcher", required=True); q.add_argument("--type", choices=["interactive","non-interactive"], default="interactive"); q.add_argument("--disk-storage", type=int); q.add_argument("--resource-class-id", type=int); q.set_defaults(func=cmd_session_launch)
-    q=sp.add_parser("list"); q.add_argument("--type", choices=["interactive","non-interactive"], default="interactive"); q.set_defaults(func=cmd_session_list)
+    q=sp.add_parser("launch"); q.add_argument("--launcher", required=True); q.add_argument("--type", choices=["interactive","non-interactive"], default="interactive"); q.add_argument("--disk-storage", type=int); q.add_argument("--resource-class-id", type=int); q.add_argument("--backend", choices=["auto","api","rnk"], default="api"); q.set_defaults(func=cmd_session_launch)
+    q=sp.add_parser("list"); q.add_argument("--type", choices=["interactive","non-interactive"], default="interactive"); q.add_argument("--page", type=int); q.add_argument("--per-page", type=int); q.set_defaults(func=cmd_session_list)
     q=sp.add_parser("get"); q.add_argument("session"); q.set_defaults(func=cmd_session_get)
     q=sp.add_parser("logs"); q.add_argument("session"); q.set_defaults(func=cmd_session_logs)
     q=sp.add_parser("delete"); q.add_argument("session"); q.set_defaults(func=cmd_session_delete)
