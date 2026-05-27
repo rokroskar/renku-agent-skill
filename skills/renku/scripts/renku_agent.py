@@ -546,6 +546,16 @@ def _project_api_path(ident: str) -> str:
     return f"/projects/{urllib.parse.quote(ident)}"
 
 
+def _project_fetch(ident: str) -> tuple[dict[str, Any], str, str]:
+    """Return (project_data, project_id, etag). Raises RenkuError if ETag is missing."""
+    proj, resp_headers = http_json("GET", _project_api_path(ident), return_headers=True)
+    proj_id = proj.get("id") or ident
+    etag = resp_headers.get("ETag") or resp_headers.get("etag")
+    if not etag:
+        raise RenkuError(f"Project GET response did not include an ETag header; cannot PATCH safely")
+    return proj, proj_id, etag
+
+
 def cmd_project_get(args: argparse.Namespace) -> None:
     print_out(http_json("GET", _project_api_path(args.project)), args)
 
@@ -593,42 +603,38 @@ def cmd_project_documentation_set(args: argparse.Namespace) -> None:
         raise RenkuError(f"Project documentation is limited to 5000 characters; got {len(content)}. Provide a shorter summary and link to longer docs.")
     if args.dry_run:
         print_out({"PATCH": "/projects/<id>", "body": {"documentation": content}, "length": len(content)}, args); return
-    project, resp_headers = http_json("GET", _project_api_path(args.project), return_headers=True)
-    project_id = project.get("id")
-    etag = resp_headers.get("ETag") or resp_headers.get("etag")
-    if not etag:
-        raise RenkuError("Cannot update documentation: project GET response did not include an ETag header")
-    data = http_json("PATCH", f"/projects/{project_id}", body={"documentation": content}, headers_extra={"If-Match": etag})
+    proj, proj_id, etag = _project_fetch(args.project)
+    data = http_json("PATCH", f"/projects/{proj_id}", body={"documentation": content}, headers_extra={"If-Match": etag})
     print_out(data, args, f"Updated documentation for project {args.project}")
 
 
 def cmd_project_repo_list(args: argparse.Namespace) -> None:
-    proj = http_json("GET", f"/projects/{args.project}")
+    proj = http_json("GET", _project_api_path(args.project))
     print_out(proj.get("repositories", []), args)
 
 
 def cmd_project_repo_add(args: argparse.Namespace) -> None:
-    proj = http_json("GET", f"/projects/{args.project}")
+    proj, proj_id, etag = _project_fetch(args.project)
     repos = list(proj.get("repositories") or [])
     url = args.url + (f"#{args.ref}" if getattr(args, "ref", None) else "")
     if url not in repos:
         repos.append(url)
     body = {"repositories": repos}
     if args.dry_run:
-        print_out({"PATCH": f"/projects/{args.project}", "body": body}, args); return
-    data = http_json("PATCH", f"/projects/{args.project}", body)
+        print_out({"PATCH": f"/projects/{proj_id}", "body": body}, args); return
+    data = http_json("PATCH", f"/projects/{proj_id}", body, headers_extra={"If-Match": etag})
     print_out(data, args, f"Updated repositories for project {args.project}")
 
 
 def cmd_project_repo_remove(args: argparse.Namespace) -> None:
     confirm(args, f"Remove repository {args.repository} from project {args.project}?")
-    proj = http_json("GET", f"/projects/{args.project}")
+    proj, proj_id, etag = _project_fetch(args.project)
     target = args.repository.split("#")[0]
     repos = [r for r in (proj.get("repositories") or []) if r.split("#")[0] != target]
     body = {"repositories": repos}
     if args.dry_run:
-        print_out({"PATCH": f"/projects/{args.project}", "body": body}, args); return
-    data = http_json("PATCH", f"/projects/{args.project}", body)
+        print_out({"PATCH": f"/projects/{proj_id}", "body": body}, args); return
+    data = http_json("PATCH", f"/projects/{proj_id}", body, headers_extra={"If-Match": etag})
     print_out(data, args, f"Removed repository from project {args.project}")
 
 
