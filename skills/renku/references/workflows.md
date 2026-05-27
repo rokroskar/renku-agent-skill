@@ -56,6 +56,17 @@ python3 scripts/renku_agent.py project create \
 
 Repositories are strings in the project's `repositories` array. Add/remove by fetching project, changing the list, and PATCHing it.
 
+## Project documentation
+
+Project documentation is the `documentation` field on the project object. Updating it requires an `If-Match` header with the current project `etag`; use the helper rather than raw `api PATCH`:
+
+```bash
+python3 scripts/renku_agent.py project documentation get <project-id-or-namespace/slug>
+python3 scripts/renku_agent.py project documentation set <project-id-or-namespace/slug> --file docs.md
+```
+
+The field is limited to 5000 characters. If a repository README is longer, write a concise Renku project summary and link to the repository README.
+
 ## Data connector then link to project
 
 DOI / Zenodo / Dataverse connectors are global. Create them with the DOI helper, then link the returned connector id to a project:

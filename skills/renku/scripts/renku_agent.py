@@ -275,7 +275,7 @@ def assert_not_admin() -> None:
         return
 
 
-def http_json(method: str, path_or_url: str, body: Any = None, auth: bool = True, absolute: bool = False, query: Optional[dict[str, Any]] = None, skip_admin_check: bool = False) -> Any:
+def http_json(method: str, path_or_url: str, body: Any = None, auth: bool = True, absolute: bool = False, query: Optional[dict[str, Any]] = None, skip_admin_check: bool = False, headers_extra: Optional[dict[str, str]] = None, return_headers: bool = False) -> Any:
     if absolute or path_or_url.startswith("http"):
         url = path_or_url
     else:
@@ -293,13 +293,16 @@ def http_json(method: str, path_or_url: str, body: Any = None, auth: bool = True
         if not skip_admin_check and not (method.upper() == "GET" and path_or_url == "/user"):
             assert_not_admin()
         headers.update(auth_header())
+    if headers_extra:
+        headers.update(headers_extra)
     req = urllib.request.Request(url, data=data, method=method.upper(), headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=60) as resp:
             raw = resp.read().decode()
-            if not raw:
-                return {"status": resp.status}
-            return json.loads(raw)
+            data = {"status": resp.status} if not raw else json.loads(raw)
+            if return_headers:
+                return data, dict(resp.headers)
+            return data
     except urllib.error.HTTPError as e:
         text = e.read().decode(errors="replace")
         try:
@@ -536,14 +539,15 @@ def cmd_project_list(args: argparse.Namespace) -> None:
     print_out(http_json("GET", "/projects", query={"name": args.search, "page": args.page, "per_page": args.per_page}), args)
 
 
-def cmd_project_get(args: argparse.Namespace) -> None:
-    ident = args.project
+def _project_api_path(ident: str) -> str:
     if "/" in ident:
         ns, slug = ident.split("/", 1)
-        path = f"/namespaces/{urllib.parse.quote(ns)}/projects/{urllib.parse.quote(slug)}"
-    else:
-        path = f"/projects/{urllib.parse.quote(ident)}"
-    print_out(http_json("GET", path), args)
+        return f"/namespaces/{urllib.parse.quote(ns)}/projects/{urllib.parse.quote(slug)}"
+    return f"/projects/{urllib.parse.quote(ident)}"
+
+
+def cmd_project_get(args: argparse.Namespace) -> None:
+    print_out(http_json("GET", _project_api_path(args.project)), args)
 
 
 def project_payload_from_args(args: argparse.Namespace) -> dict[str, Any]:
@@ -570,8 +574,9 @@ def cmd_project_create(args: argparse.Namespace) -> None:
 
 
 def cmd_project_documentation_get(args: argparse.Namespace) -> None:
-    data = http_json("GET", f"/projects/{urllib.parse.quote(args.project)}/documentation")
-    print_out(data, args)
+    data = http_json("GET", _project_api_path(args.project))
+    content = data.get("documentation") or ""
+    print_out({"content": content, "length": len(content)}, args)
 
 
 def cmd_project_documentation_set(args: argparse.Namespace) -> None:
@@ -584,9 +589,16 @@ def cmd_project_documentation_set(args: argparse.Namespace) -> None:
         content = args.content
     else:
         raise RenkuError("Provide documentation via --content TEXT or --file PATH")
+    if len(content) > 5000:
+        raise RenkuError(f"Project documentation is limited to 5000 characters; got {len(content)}. Provide a shorter summary and link to longer docs.")
     if args.dry_run:
-        print_out({"PUT": f"/projects/{args.project}/documentation", "length": len(content)}, args); return
-    data = http_json("PUT", f"/projects/{urllib.parse.quote(args.project)}/documentation", body={"content": content})
+        print_out({"PATCH": "/projects/<id>", "body": {"documentation": content}, "length": len(content)}, args); return
+    project, resp_headers = http_json("GET", _project_api_path(args.project), return_headers=True)
+    project_id = project.get("id")
+    etag = resp_headers.get("ETag") or resp_headers.get("etag")
+    if not etag:
+        raise RenkuError("Cannot update documentation: project GET response did not include an ETag header")
+    data = http_json("PATCH", f"/projects/{project_id}", body={"documentation": content}, headers_extra={"If-Match": etag})
     print_out(data, args, f"Updated documentation for project {args.project}")
 
 

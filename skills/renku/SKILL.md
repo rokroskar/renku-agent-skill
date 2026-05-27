@@ -106,12 +106,12 @@ python3 scripts/renku_agent.py project create --name "My Project" --namespace <n
 
 ### Project documentation
 
-Projects have a `documentation` field (Markdown) managed via a dedicated endpoint. Do **not** use `api PATCH /projects/{id}` with a `documentation` field — use the documentation subcommands instead:
+Projects have a `documentation` field (Markdown) on the project object. Use the helper subcommands; they fetch the project `etag` and patch `/projects/<id>` with the required `If-Match` header. The documentation field is limited to 5000 characters, so keep project-facing docs concise and link to repository docs for details.
 
 ```bash
-python3 scripts/renku_agent.py project documentation get <project-id>
-python3 scripts/renku_agent.py project documentation set <project-id> --content "# My docs"
-python3 scripts/renku_agent.py project documentation set <project-id> --file docs.md
+python3 scripts/renku_agent.py project documentation get <project-id-or-namespace/slug>
+python3 scripts/renku_agent.py project documentation set <project-id-or-namespace/slug> --content "# My docs"
+python3 scripts/renku_agent.py project documentation set <project-id-or-namespace/slug> --file docs.md
 ```
 
 Add repositories as project-level assets:
