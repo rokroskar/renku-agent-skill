@@ -104,6 +104,16 @@ python3 scripts/renku_agent.py project get <project-id-or-namespace/slug>
 python3 scripts/renku_agent.py project create --name "My Project" --namespace <namespace> --visibility private
 ```
 
+### Project documentation
+
+Projects have a `documentation` field (Markdown) managed via a dedicated endpoint. Do **not** use `api PATCH /projects/{id}` with a `documentation` field — use the documentation subcommands instead:
+
+```bash
+python3 scripts/renku_agent.py project documentation get <project-id>
+python3 scripts/renku_agent.py project documentation set <project-id> --content "# My docs"
+python3 scripts/renku_agent.py project documentation set <project-id> --file docs.md
+```
+
 Add repositories as project-level assets:
 
 ```bash
@@ -137,8 +147,11 @@ python3 scripts/renku_agent.py connector unlink --connector <connector-id> --lin
 Create supported P0 connector types:
 
 ```bash
-# DOI / Zenodo / Dataverse global connector
-python3 scripts/renku_agent.py connector create doi --name "Dataset" --doi "10.xxxx/..." --target-path data --global
+# DOI / Zenodo / Dataverse — always global, no namespace needed.
+# Only --name, --doi (or --url), and --target-path are required.
+# The helper automatically routes to the global endpoint; do NOT pass --namespace or --global.
+python3 scripts/renku_agent.py connector create doi --name "Delhi air quality" --doi "10.5281/zenodo.1234567" --target-path air-quality-data
+python3 scripts/renku_agent.py connector create zenodo --name "Dataset" --url "https://zenodo.org/record/..." --target-path data
 
 # S3/S3-compatible; prompts for secrets interactively, or set RENKU_S3_ACCESS_KEY_ID / RENKU_S3_SECRET_ACCESS_KEY
 python3 scripts/renku_agent.py connector create s3 --name "S3 Data" --bucket my-bucket --endpoint https://s3.example.org --target-path data

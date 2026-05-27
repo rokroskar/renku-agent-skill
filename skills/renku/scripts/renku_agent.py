@@ -312,18 +312,23 @@ def http_json(method: str, path_or_url: str, body: Any = None, auth: bool = True
 
 
 def read_body_arg(args: argparse.Namespace) -> dict[str, Any]:
-    if getattr(args, "body", None):
-        if args.body == "-":
-            return json.load(sys.stdin)
-        return json.loads(Path(args.body).read_text())
-    if getattr(args, "payload", None):
-        return json.loads(args.payload)
+    try:
+        if getattr(args, "body", None):
+            if args.body == "-":
+                return json.load(sys.stdin)
+            return json.loads(Path(args.body).read_text())
+        if getattr(args, "payload", None):
+            return json.loads(args.payload)
+    except (OSError, ValueError) as e:
+        raise RenkuError(f"Failed to read JSON body: {e}")
     raise RenkuError("A JSON body is required via --body FILE, --body -, or --payload JSON")
 
 
 def confirm(args: argparse.Namespace, message: str) -> None:
     if getattr(args, "yes", False):
         return
+    if not sys.stdin.isatty():
+        raise RenkuError(f"Confirmation required but stdin is not a TTY; pass --yes to proceed: {message}")
     ans = input(f"{message}\nType 'yes' to continue: ")
     if ans != "yes":
         raise RenkuError("Cancelled")
@@ -338,7 +343,6 @@ def try_rnk() -> Optional[str]:
     if cached.exists() and os.access(cached, os.X_OK):
         return str(cached)
     return None
-
 
 
 def auth_state_path(base: str) -> Path:
@@ -534,7 +538,7 @@ def cmd_project_list(args: argparse.Namespace) -> None:
 
 def cmd_project_get(args: argparse.Namespace) -> None:
     ident = args.project
-    if "/" in ident and not ident.startswith("01"):
+    if "/" in ident:
         ns, slug = ident.split("/", 1)
         path = f"/namespaces/{urllib.parse.quote(ns)}/projects/{urllib.parse.quote(slug)}"
     else:
@@ -565,6 +569,27 @@ def cmd_project_create(args: argparse.Namespace) -> None:
     print_out(data, args, f"Created project {data.get('namespace')}/{data.get('slug')} ({data.get('id')})")
 
 
+def cmd_project_documentation_get(args: argparse.Namespace) -> None:
+    data = http_json("GET", f"/projects/{urllib.parse.quote(args.project)}/documentation")
+    print_out(data, args)
+
+
+def cmd_project_documentation_set(args: argparse.Namespace) -> None:
+    if getattr(args, "file", None):
+        try:
+            content = Path(args.file).read_text()
+        except OSError as e:
+            raise RenkuError(f"Cannot read documentation file: {e}")
+    elif getattr(args, "content", None) is not None:
+        content = args.content
+    else:
+        raise RenkuError("Provide documentation via --content TEXT or --file PATH")
+    if args.dry_run:
+        print_out({"PUT": f"/projects/{args.project}/documentation", "length": len(content)}, args); return
+    data = http_json("PUT", f"/projects/{urllib.parse.quote(args.project)}/documentation", body={"content": content})
+    print_out(data, args, f"Updated documentation for project {args.project}")
+
+
 def cmd_project_repo_list(args: argparse.Namespace) -> None:
     proj = http_json("GET", f"/projects/{args.project}")
     print_out(proj.get("repositories", []), args)
@@ -586,7 +611,8 @@ def cmd_project_repo_add(args: argparse.Namespace) -> None:
 def cmd_project_repo_remove(args: argparse.Namespace) -> None:
     confirm(args, f"Remove repository {args.repository} from project {args.project}?")
     proj = http_json("GET", f"/projects/{args.project}")
-    repos = [r for r in (proj.get("repositories") or []) if r != args.repository]
+    target = args.repository.split("#")[0]
+    repos = [r for r in (proj.get("repositories") or []) if r.split("#")[0] != target]
     body = {"repositories": repos}
     if args.dry_run:
         print_out({"PATCH": f"/projects/{args.project}", "body": body}, args); return
@@ -638,7 +664,10 @@ def _prompt_secret(prompt: str, env_var: str, arg_val: Optional[str] = None) -> 
 def connector_storage(args: argparse.Namespace) -> dict[str, Any]:
     target = args.target_path
     if args.kind in ("doi", "zenodo", "dataverse"):
-        return {"storage_url": args.doi or args.url, "target_path": target, "readonly": True}
+        doi_or_url = args.doi or args.url
+        if not doi_or_url:
+            raise RenkuError(f"connector create {args.kind} requires --doi <DOI> or --url <URL>")
+        return {"storage_url": doi_or_url, "target_path": target, "readonly": True}
     if args.kind == "s3":
         access_key = _prompt_input("S3 access key id: ", "RENKU_S3_ACCESS_KEY_ID", getattr(args, "access_key_id", None))
         secret_key = _prompt_secret("S3 secret access key: ", "RENKU_S3_SECRET_ACCESS_KEY", getattr(args, "secret_access_key", None))
@@ -680,8 +709,12 @@ def cmd_connector_create(args: argparse.Namespace) -> None:
     if args.body or args.payload:
         body = read_body_arg(args)
     else:
+        if getattr(args, "kind", None) in ("doi", "zenodo", "dataverse"):
+            if getattr(args, "namespace", None):
+                print("Warning: --namespace is ignored for DOI/Zenodo/Dataverse connectors; they are always created as global connectors.", file=sys.stderr)
+            args.global_connector = True
         body = {"name": args.name, "storage": connector_storage(args)}
-        if args.namespace: body["namespace"] = args.namespace
+        if not args.global_connector and args.namespace: body["namespace"] = args.namespace
         if args.slug: body["slug"] = args.slug
         if args.visibility: body["visibility"] = args.visibility
         if args.description: body["description"] = args.description
@@ -709,7 +742,7 @@ def cmd_connector_unlink(args: argparse.Namespace) -> None:
 
 
 def simple_crud(resource: str, path: str):
-    def list_cmd(args): print_out(http_json("GET", path), args)
+    def list_cmd(args): print_out(http_json("GET", path, query={"page": getattr(args, "page", None), "per_page": getattr(args, "per_page", None)}), args)
     def get_cmd(args): print_out(http_json("GET", f"{path}/{getattr(args, resource)}"), args)
     def create_cmd(args):
         body = read_body_arg(args)
@@ -721,6 +754,7 @@ def simple_crud(resource: str, path: str):
         print_out(http_json("PATCH", f"{path}/{getattr(args, resource)}", body), args)
     def delete_cmd(args):
         confirm(args, f"Delete {resource} {getattr(args, resource)}?")
+        if args.dry_run: print_out({"DELETE": f"{path}/{getattr(args, resource)}"}, args); return
         print_out(http_json("DELETE", f"{path}/{getattr(args, resource)}"), args)
     return list_cmd, get_cmd, create_cmd, patch_cmd, delete_cmd
 
@@ -789,6 +823,8 @@ def cmd_build_wait(args: argparse.Namespace) -> None:
                     print(f"build logs unavailable: {e}")
         if status in terminal:
             print_out(build, args)
+            if status not in success:
+                raise RenkuError(f"Build {args.build} ended with status: {status}")
             return
         last_status = status
         time.sleep(args.interval)
@@ -862,7 +898,7 @@ def cmd_session_wait(args: argparse.Namespace) -> None:
         if state in terminal:
             print_out(session, args)
             if state not in success:
-                return
+                raise RenkuError(f"Session/job {args.session} ended with state: {state}")
             return
         last_state = state
         time.sleep(args.interval)
@@ -911,6 +947,9 @@ def main(argv=None) -> int:
     q=sp.add_parser("list"); q.add_argument("--search"); q.add_argument("--page", type=int); q.add_argument("--per-page", type=int); q.set_defaults(func=cmd_project_list)
     q=sp.add_parser("get"); q.add_argument("project"); q.set_defaults(func=cmd_project_get)
     q=sp.add_parser("create"); q.add_argument("--name", required=False); q.add_argument("--namespace"); q.add_argument("--slug"); q.add_argument("--visibility"); q.add_argument("--description"); q.add_argument("--documentation"); q.add_argument("--keyword", action="append"); q.add_argument("--repository", action="append"); q.add_argument("--secrets-mount-directory"); q.add_argument("--body"); q.add_argument("--payload"); q.set_defaults(func=cmd_project_create)
+    dp=sp.add_parser("documentation"); dsp=dp.add_subparsers(dest="documentation_cmd", required=True)
+    q=dsp.add_parser("get"); q.add_argument("project"); q.set_defaults(func=cmd_project_documentation_get)
+    q=dsp.add_parser("set"); q.add_argument("project"); q.add_argument("--content"); q.add_argument("--file"); q.set_defaults(func=cmd_project_documentation_set)
     rp=sp.add_parser("repo"); rsp=rp.add_subparsers(dest="repo_cmd", required=True)
     q=rsp.add_parser("list"); q.add_argument("--project", required=True); q.set_defaults(func=cmd_project_repo_list)
     q=rsp.add_parser("add"); q.add_argument("--project", required=True); q.add_argument("--url", required=True); q.add_argument("--ref"); q.set_defaults(func=cmd_project_repo_add)
@@ -930,7 +969,7 @@ def main(argv=None) -> int:
     for name,path,key in [("launcher","/session_launchers","launcher"),("environment","/environments","environment")]:
         p=sub.add_parser(name); sp=p.add_subparsers(dest=f"{name}_cmd", required=True)
         funcs=simple_crud(key,path)
-        sp.add_parser("list").set_defaults(func=funcs[0])
+        q=sp.add_parser("list"); q.add_argument("--page", type=int); q.add_argument("--per-page", type=int); q.set_defaults(func=funcs[0])
         q=sp.add_parser("get"); q.add_argument(key); q.set_defaults(func=funcs[1])
         q=sp.add_parser("create"); q.add_argument("--body", required=True); q.add_argument("--payload"); q.set_defaults(func=funcs[2])
         q=sp.add_parser("patch"); q.add_argument(key); q.add_argument("--body", required=True); q.add_argument("--payload"); q.set_defaults(func=funcs[3])
@@ -943,7 +982,7 @@ def main(argv=None) -> int:
     q=sp.add_parser("start"); q.add_argument("--environment", required=True); q.set_defaults(func=lambda a: print_out(http_json("POST", f"/environments/{a.environment}/builds"), a))
     q=sp.add_parser("get"); q.add_argument("build"); q.set_defaults(func=lambda a: print_out(http_json("GET", f"/builds/{a.build}"), a))
     q=sp.add_parser("logs"); q.add_argument("build"); q.set_defaults(func=lambda a: print_out(http_json("GET", f"/builds/{a.build}/logs"), a))
-    q=sp.add_parser("wait"); q.add_argument("build"); q.add_argument("--timeout", type=int, default=1800); q.add_argument("--interval", type=int, default=15); q.add_argument("--logs", action="store_true", default=True); q.add_argument("--log-lines", type=int, default=10); q.add_argument("--verbose", action="store_true"); q.set_defaults(func=cmd_build_wait)
+    q=sp.add_parser("wait"); q.add_argument("build"); q.add_argument("--timeout", type=int, default=1800); q.add_argument("--interval", type=int, default=15); q.add_argument("--logs", action="store_true", default=True); q.add_argument("--no-logs", dest="logs", action="store_false"); q.add_argument("--log-lines", type=int, default=10); q.add_argument("--verbose", action="store_true"); q.set_defaults(func=cmd_build_wait)
 
     p=sub.add_parser("session"); sp=p.add_subparsers(dest="session_cmd", required=True)
     q=sp.add_parser("launch"); q.add_argument("--launcher", required=True); q.add_argument("--type", choices=["interactive","non-interactive"], default="interactive"); q.add_argument("--disk-storage", type=int); q.add_argument("--resource-class-id", type=int); q.set_defaults(func=cmd_session_launch)
