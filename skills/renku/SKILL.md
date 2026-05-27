@@ -187,12 +187,15 @@ When the user gives a Git repository with Python dependency files, offer this wo
 3. Use the JupyterLab frontend for notebook/Python repos.
 4. Optionally start a build/session after the launcher is created.
 
-Build-from-code launcher body example:
+All launchers require `launcher_type`. Use `interactive` for sessions with a UI; use `non_interactive` for batch jobs that run to completion. **This cannot be changed at launch time** — create separate launchers for interactive and non-interactive use of the same environment.
+
+Build-from-code launcher body example (interactive):
 
 ```json
 {
   "project_id": "<project-id>",
   "name": "JupyterLab from repository",
+  "launcher_type": "interactive",
   "description": "Builds a JupyterLab environment from the linked repository.",
   "environment": {
     "environment_image_source": "build",
@@ -202,6 +205,23 @@ Build-from-code launcher body example:
     "repository_revision": "main",
     "context_dir": ".",
     "platforms": ["linux/amd64"]
+  }
+}
+```
+
+Non-interactive job launcher body example:
+
+```json
+{
+  "project_id": "<project-id>",
+  "name": "Run notebooks batch",
+  "launcher_type": "non_interactive",
+  "environment": {
+    "environment_image_source": "image",
+    "environment_kind": "CUSTOM",
+    "container_image": "<built-image>",
+    "command": ["/cnb/lifecycle/launcher"],
+    "args": ["python", "-c", "..."]
   }
 }
 ```
@@ -237,11 +257,15 @@ Use `build wait <build-id>` instead of writing ad-hoc polling loops. It polls th
 
 ### Sessions and Non-interactive Jobs
 
-Interactive sessions and non-interactive jobs both use `POST /sessions`. Jobs set `session_type` to `non-interactive`.
+Both interactive sessions and non-interactive jobs are started via `POST /sessions` with only `launcher_id` in the body. The session behaviour (interactive vs non-interactive) is determined entirely by the **launcher's `launcher_type`** field — it cannot be overridden at launch time.
+
+- `launcher_type: interactive` → interactive session (JupyterLab, VSCode, etc.)
+- `launcher_type: non_interactive` → Kubernetes Job, no UI, runs to completion
+
+**A launcher must be created with the correct `launcher_type` before launching.** Use `job run` only with launchers that already have `launcher_type: non_interactive` — it validates this before starting the job.
 
 ```bash
 python3 scripts/renku_agent.py session launch --launcher <launcher-id>
-python3 scripts/renku_agent.py session launch --launcher <launcher-id> --type non-interactive
 python3 scripts/renku_agent.py job run --launcher <launcher-id>
 
 python3 scripts/renku_agent.py session list

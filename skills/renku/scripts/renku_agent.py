@@ -832,14 +832,31 @@ def cmd_build_wait(args: argparse.Namespace) -> None:
 
 
 def cmd_session_launch(args: argparse.Namespace) -> None:
-    body = {"launcher_id": args.launcher}
-    if args.type: body["session_type"] = args.type
+    body: dict[str, Any] = {"launcher_id": args.launcher}
     if args.disk_storage is not None: body["disk_storage"] = args.disk_storage
     if args.resource_class_id is not None: body["resource_class_id"] = args.resource_class_id
     if args.dry_run:
         print_out({"POST": "/sessions", "body": body}, args); return
     data = add_iframe_url(http_json("POST", "/sessions", body))
-    print_out(data, args, f"Launched {body.get('session_type','interactive')} session {data.get('name') or data.get('id') or ''}")
+    print_out(data, args, f"Launched session {data.get('name') or data.get('id') or ''}")
+
+
+def cmd_job_run(args: argparse.Namespace) -> None:
+    launcher = http_json("GET", f"/session_launchers/{args.launcher}")
+    lt = launcher.get("launcher_type", "")
+    if lt != "non_interactive":
+        raise RenkuError(
+            f"Launcher {args.launcher} has launcher_type={lt!r}. "
+            "Non-interactive jobs require a launcher with launcher_type: non_interactive. "
+            "Create a new launcher with launcher_type: non_interactive, or patch the existing one."
+        )
+    body: dict[str, Any] = {"launcher_id": args.launcher}
+    if args.disk_storage is not None: body["disk_storage"] = args.disk_storage
+    if args.resource_class_id is not None: body["resource_class_id"] = args.resource_class_id
+    if args.dry_run:
+        print_out({"POST": "/sessions", "body": body}, args); return
+    data = add_iframe_url(http_json("POST", "/sessions", body))
+    print_out(data, args, f"Launched non-interactive job {data.get('name') or data.get('id') or ''}")
 
 
 def cmd_session_list(args: argparse.Namespace) -> None:
@@ -985,7 +1002,7 @@ def main(argv=None) -> int:
     q=sp.add_parser("wait"); q.add_argument("build"); q.add_argument("--timeout", type=int, default=1800); q.add_argument("--interval", type=int, default=15); q.add_argument("--logs", action="store_true", default=True); q.add_argument("--no-logs", dest="logs", action="store_false"); q.add_argument("--log-lines", type=int, default=10); q.add_argument("--verbose", action="store_true"); q.set_defaults(func=cmd_build_wait)
 
     p=sub.add_parser("session"); sp=p.add_subparsers(dest="session_cmd", required=True)
-    q=sp.add_parser("launch"); q.add_argument("--launcher", required=True); q.add_argument("--type", choices=["interactive","non-interactive"], default="interactive"); q.add_argument("--disk-storage", type=int); q.add_argument("--resource-class-id", type=int); q.set_defaults(func=cmd_session_launch)
+    q=sp.add_parser("launch"); q.add_argument("--launcher", required=True); q.add_argument("--disk-storage", type=int); q.add_argument("--resource-class-id", type=int); q.set_defaults(func=cmd_session_launch)
     q=sp.add_parser("list"); q.add_argument("--type", choices=["interactive","non-interactive"], default="interactive"); q.add_argument("--page", type=int); q.add_argument("--per-page", type=int); q.set_defaults(func=cmd_session_list)
     q=sp.add_parser("get"); q.add_argument("session"); q.set_defaults(func=cmd_session_get)
     q=sp.add_parser("logs"); q.add_argument("session"); q.set_defaults(func=cmd_session_logs)
@@ -993,7 +1010,7 @@ def main(argv=None) -> int:
     q=sp.add_parser("wait"); q.add_argument("session"); q.add_argument("--timeout", type=int, default=900); q.add_argument("--interval", type=int, default=10); q.add_argument("--logs", action="store_true"); q.add_argument("--log-lines", type=int, default=5); q.add_argument("--verbose", action="store_true"); q.set_defaults(func=cmd_session_wait)
 
     p=sub.add_parser("job"); sp=p.add_subparsers(dest="job_cmd", required=True)
-    q=sp.add_parser("run"); q.add_argument("--launcher", required=True); q.add_argument("--disk-storage", type=int); q.add_argument("--resource-class-id", type=int); q.set_defaults(type="non-interactive", func=cmd_session_launch)
+    q=sp.add_parser("run"); q.add_argument("--launcher", required=True); q.add_argument("--disk-storage", type=int); q.add_argument("--resource-class-id", type=int); q.set_defaults(func=cmd_job_run)
     q=sp.add_parser("list"); q.add_argument("--page", type=int); q.add_argument("--per-page", type=int); q.set_defaults(type="non-interactive", func=cmd_session_list)
     q=sp.add_parser("logs"); q.add_argument("session"); q.set_defaults(func=cmd_session_logs)
     q=sp.add_parser("stop"); q.add_argument("session"); q.set_defaults(func=cmd_session_delete)

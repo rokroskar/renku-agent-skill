@@ -139,7 +139,7 @@ python3 scripts/renku_agent.py job wait <job-session-id>
 python3 scripts/renku_agent.py session logs <session-id>
 ```
 
-This wraps `POST /sessions` with `session_type: non-interactive`.
+The session behaviour is determined by `launcher_type` on the launcher, not by the `POST /sessions` request. `job run` validates that the launcher has `launcher_type: non_interactive` before starting.
 
 Use `job wait` rather than writing custom polling loops. It polls status, prints concise log tails, and exits when the job reaches a terminal state:
 
@@ -165,21 +165,22 @@ A build-from-code launcher has an environment like:
 }
 ```
 
-After the build succeeds, the launcher can be converted to an external-image job launcher by PATCHing the launcher environment:
+After the build succeeds, create a **separate** launcher for the job (preserving the original interactive one) or patch the existing launcher. Either way, the launcher must have `launcher_type: non_interactive`.
 
 1. Get the launcher and confirm the build succeeded.
 2. Use the built `environment.container_image` as the fixed image.
-3. Set `environment_image_source` to `image`.
-4. Keep `environment_kind` as `CUSTOM`.
+3. Set `environment_image_source` to `image`, `environment_kind` to `CUSTOM`.
+4. Set `launcher_type` to `non_interactive`.
 5. Set `command` to `["/cnb/lifecycle/launcher"]` so the CNB launch environment is initialized correctly.
-6. Set `args` to the command to run inside the image.
-7. Run with `job run --launcher <launcher-id>` (`session_type: non-interactive`).
+6. Set `args` to the batch command.
+7. Run with `job run --launcher <launcher-id>` (validates `launcher_type: non_interactive` before starting).
 
 For notebook batch execution, prefer a Python `-c` script over complex shell quoting. Example launcher patch:
 
 ```json
 {
   "name": "Run notebooks batch",
+  "launcher_type": "non_interactive",
   "description": "Non-interactive launcher that executes notebooks and writes rendered notebooks to output-data.",
   "environment": {
     "name": "Run notebooks batch",
