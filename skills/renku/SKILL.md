@@ -187,15 +187,14 @@ When the user gives a Git repository with Python dependency files, offer this wo
 3. Use the JupyterLab frontend for notebook/Python repos.
 4. Optionally start a build/session after the launcher is created.
 
-All launchers require `launcher_type`. Use `interactive` for sessions with a UI; use `non_interactive` for batch jobs that run to completion. **This cannot be changed at launch time** — create separate launchers for interactive and non-interactive use of the same environment.
+The session type (`interactive` vs `non-interactive`) is determined at **launch time** by the `session_type` field in the POST /sessions body — not by any field on the launcher itself. `session launch` always sets `session_type: "interactive"`; `job run` always sets `session_type: "non-interactive"`. The launcher only holds the environment definition.
 
-Build-from-code launcher body example (interactive):
+Build-from-code launcher body example:
 
 ```json
 {
   "project_id": "<project-id>",
   "name": "JupyterLab from repository",
-  "launcher_type": "interactive",
   "description": "Builds a JupyterLab environment from the linked repository.",
   "environment": {
     "environment_image_source": "build",
@@ -209,13 +208,12 @@ Build-from-code launcher body example (interactive):
 }
 ```
 
-Non-interactive job launcher body example:
+Non-interactive job launcher body example (uses a pre-built image):
 
 ```json
 {
   "project_id": "<project-id>",
   "name": "Run notebooks batch",
-  "launcher_type": "non_interactive",
   "environment": {
     "environment_image_source": "image",
     "environment_kind": "CUSTOM",
@@ -257,12 +255,12 @@ Use `build wait <build-id>` instead of writing ad-hoc polling loops. It polls th
 
 ### Sessions and Non-interactive Jobs
 
-Both interactive sessions and non-interactive jobs are started via `POST /sessions` with only `launcher_id` in the body. The session behaviour (interactive vs non-interactive) is determined entirely by the **launcher's `launcher_type`** field — it cannot be overridden at launch time.
+Both interactive sessions and non-interactive jobs are started via `POST /sessions`. The session behaviour is determined by the `session_type` field in the POST /sessions body:
 
-- `launcher_type: interactive` → interactive session (JupyterLab, VSCode, etc.)
-- `launcher_type: non_interactive` → Kubernetes Job, no UI, runs to completion
+- `session_type: "interactive"` → interactive session (JupyterLab, VSCode, etc.) — used by `session launch`
+- `session_type: "non-interactive"` → Kubernetes Job, no UI, runs to completion — used by `job run`
 
-**A launcher must be created with the correct `launcher_type` before launching.** Use `job run` only with launchers that already have `launcher_type: non_interactive` — it validates this before starting the job.
+The launcher itself has no `launcher_type` field. The same launcher can in principle be used for both interactive and non-interactive launches; the distinction is made at launch time.
 
 ```bash
 python3 scripts/renku_agent.py session launch --launcher <launcher-id>
@@ -294,15 +292,17 @@ The raw session URL returned by the API, e.g. `<base>/sessions/<session-name>/la
 
 Use `job wait <job-session-id>` or `session wait <session-id> --logs` instead of writing ad-hoc polling loops. These commands poll status, optionally show log tails, and stop at terminal states.
 
-To convert a successful build-from-code launcher into a non-interactive job launcher:
+To run a batch job using an image built by a build-from-code launcher:
 
-1. Get the launcher and use the built `environment.container_image`.
-2. Patch the environment to `environment_image_source: "image"` and `environment_kind: "CUSTOM"`.
-3. Set `command` to `["/cnb/lifecycle/launcher"]` to initialize the CNB launch environment.
-4. Set `args` to the batch command. For notebook execution, prefer `python -c` invoking `jupyter nbconvert` over complex shell quoting.
-5. Run with `job run --launcher <launcher-id>`.
+1. Wait for the build to succeed and note the `environment.container_image` URI.
+2. Create a new launcher (or patch the existing one) with:
+   - `environment_image_source: "image"` and `environment_kind: "CUSTOM"`
+   - `container_image` set to the built image URI
+   - `command: ["/cnb/lifecycle/launcher"]` to initialize the CNB launch environment
+   - `args` set to the batch command (prefer `python -c` for notebook execution)
+3. Run with `job run --launcher <launcher-id>` — this sets `session_type: "non-interactive"` at launch time.
 
-If preserving the original interactive launcher matters, create a separate launcher instead of patching it in place. See `references/workflows.md` for a full build-from-code-to-job patch example.
+If preserving the original interactive launcher matters, create a separate launcher instead of patching it in place. See `references/workflows.md` for a full example.
 
 Before rerunning a non-interactive job from the same launcher/project, check for an existing failed/stopped job session with the same session name. Remove failed job sessions before starting a new one, otherwise Renku may reuse or conflict with the previous failed session. Deleting failed/stopped job sessions is allowed when the user explicitly asks to rerun the job; mention what is being removed.
 

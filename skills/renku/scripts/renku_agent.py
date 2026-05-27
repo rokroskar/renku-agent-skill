@@ -832,7 +832,7 @@ def cmd_build_wait(args: argparse.Namespace) -> None:
 
 
 def cmd_session_launch(args: argparse.Namespace) -> None:
-    body: dict[str, Any] = {"launcher_id": args.launcher}
+    body: dict[str, Any] = {"launcher_id": args.launcher, "session_type": "interactive"}
     if args.disk_storage is not None: body["disk_storage"] = args.disk_storage
     if args.resource_class_id is not None: body["resource_class_id"] = args.resource_class_id
     if args.dry_run:
@@ -842,15 +842,7 @@ def cmd_session_launch(args: argparse.Namespace) -> None:
 
 
 def cmd_job_run(args: argparse.Namespace) -> None:
-    launcher = http_json("GET", f"/session_launchers/{args.launcher}")
-    lt = launcher.get("launcher_type", "")
-    if lt != "non_interactive":
-        raise RenkuError(
-            f"Launcher {args.launcher} has launcher_type={lt!r}. "
-            "Non-interactive jobs require a launcher with launcher_type: non_interactive. "
-            "Create a new launcher with launcher_type: non_interactive, or patch the existing one."
-        )
-    body: dict[str, Any] = {"launcher_id": args.launcher}
+    body: dict[str, Any] = {"launcher_id": args.launcher, "session_type": "non-interactive"}
     if args.disk_storage is not None: body["disk_storage"] = args.disk_storage
     if args.resource_class_id is not None: body["resource_class_id"] = args.resource_class_id
     if args.dry_run:

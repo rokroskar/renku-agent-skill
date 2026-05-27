@@ -165,22 +165,20 @@ A build-from-code launcher has an environment like:
 }
 ```
 
-After the build succeeds, create a **separate** launcher for the job (preserving the original interactive one) or patch the existing launcher. Either way, the launcher must have `launcher_type: non_interactive`.
+After the build succeeds, create a **separate** launcher for the job (preserving the original interactive one) or patch the existing launcher. The `session_type` (`interactive` vs `non-interactive`) is set at launch time in the POST /sessions body — there is no `launcher_type` field on the launcher.
 
 1. Get the launcher and confirm the build succeeded.
 2. Use the built `environment.container_image` as the fixed image.
 3. Set `environment_image_source` to `image`, `environment_kind` to `CUSTOM`.
-4. Set `launcher_type` to `non_interactive`.
-5. Set `command` to `["/cnb/lifecycle/launcher"]` so the CNB launch environment is initialized correctly.
-6. Set `args` to the batch command.
-7. Run with `job run --launcher <launcher-id>` (validates `launcher_type: non_interactive` before starting).
+4. Set `command` to `["/cnb/lifecycle/launcher"]` so the CNB launch environment is initialized correctly.
+5. Set `args` to the batch command.
+6. Run with `job run --launcher <launcher-id>` — this sets `session_type: "non-interactive"` at launch time.
 
 For notebook batch execution, prefer a Python `-c` script over complex shell quoting. Example launcher patch:
 
 ```json
 {
   "name": "Run notebooks batch",
-  "launcher_type": "non_interactive",
   "description": "Non-interactive launcher that executes notebooks and writes rendered notebooks to output-data.",
   "environment": {
     "name": "Run notebooks batch",
