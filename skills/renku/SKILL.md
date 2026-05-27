@@ -168,7 +168,9 @@ Create supported P0 connector types:
 # DOI / Zenodo / Dataverse — always global, no namespace needed.
 # The helper automatically routes to /data_connectors/global and sends only the storage body.
 # Do NOT pass --namespace for DOI connectors; that would create a project-owned connector if using raw API.
-# Name/slug/visibility/target path are derived from DOI metadata by Renku for global DOI connectors.
+# Name, slug, visibility, and target_path are ALL derived from DOI metadata by Renku — do not assume
+# the mount path will be "data/" or similar. Always read target_path from the response and use that.
+# The helper prints: target_path: '<value>' (mount at /home/renku/work/<value>)
 python3 scripts/renku_agent.py connector create doi --doi "10.5281/zenodo.1234567"
 python3 scripts/renku_agent.py connector create zenodo --doi "10.5281/zenodo.10058130"
 

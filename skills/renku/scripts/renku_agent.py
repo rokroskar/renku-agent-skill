@@ -751,7 +751,12 @@ def cmd_connector_create(args: argparse.Namespace) -> None:
     if args.dry_run:
         print_out({"POST": path, "body": redact(body)}, args); return
     data = http_json("POST", path, body)
-    print_out(data, args, f"Created data connector {data.get('name')} ({data.get('id')})")
+    storage = data.get("storage") or {}
+    target = storage.get("target_path")
+    summary = f"Created data connector {data.get('name')} ({data.get('id')})"
+    if target:
+        summary += f" — target_path: {target!r} (mount at /home/renku/work/{target})"
+    print_out(data, args, summary)
 
 
 def cmd_connector_link(args: argparse.Namespace) -> None:

@@ -78,6 +78,8 @@ python3 scripts/renku_agent.py connector link --connector <connector-id> --proje
 
 Do not create DOI connectors by manually POSTing a payload with `namespace`; that creates a project-owned connector instead of a global DOI connector. The global DOI endpoint expects only `storage.configuration.{type,doi,provider}` plus storage fields and derives name/slug/target path from the DOI metadata.
 
+The `target_path` (mount path) for DOI connectors is set by Renku from the DOI metadata — it is **not** `data/` or any other default. Always read `storage.target_path` from the creation response before referencing the data in a session or job. The helper prints it as `target_path: '<value>' (mount at /home/renku/work/<value>)`. If the connector already exists, run `connector get <id>` to retrieve it.
+
 For S3/Polybox/SWITCHdrive the helper prompts for secrets and redacts them from output. Data connector `target_path` values are relative to the session working directory, so use `output` or `zurich-air-quality-data` rather than `/output` or `/zurich-air-quality-data`.
 
 For shared Polybox/SWITCHdrive connectors, the API expects `configuration.public_link` rather than `configuration.url`. Use the helper flags; for example:
