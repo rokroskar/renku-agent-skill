@@ -239,11 +239,15 @@ Non-interactive job launcher body example (uses a pre-built image):
     "environment_image_source": "image",
     "environment_kind": "CUSTOM",
     "container_image": "<built-image>",
+    "working_directory": "/home/renku/work",
+    "mount_directory": "/home/renku/work",
     "command": ["/cnb/lifecycle/launcher"],
     "args": ["python", "-c", "..."]
   }
 }
 ```
+
+For any launcher using a custom image (`environment_kind: "CUSTOM"`), both `working_directory` and `mount_directory` must be set. For images built on Renku (including all build-from-code outputs) use `/home/renku/work` for both — this is where the project data connector is mounted and where notebooks expect to find their working tree.
 
 Known build variants/frontends:
 
@@ -319,6 +323,7 @@ To run a batch job using an image built by a build-from-code launcher:
 2. Create a new launcher (or patch the existing one) with:
    - `environment_image_source: "image"` and `environment_kind: "CUSTOM"`
    - `container_image` set to the built image URI
+   - `working_directory: "/home/renku/work"` and `mount_directory: "/home/renku/work"` (required for custom images; this is where data connectors are mounted)
    - `command: ["/cnb/lifecycle/launcher"]` to initialize the CNB launch environment
    - `args` set to the batch command (prefer `python -c` for notebook execution)
 3. Run with `job run --launcher <launcher-id>` — this sets `session_type: "non-interactive"` at launch time.
