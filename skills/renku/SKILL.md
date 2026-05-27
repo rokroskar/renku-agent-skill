@@ -59,7 +59,7 @@ If `auth status`, `user`, or any API response shows the current user has `is_adm
 - Read-only operations may be run freely only for non-admin users.
 - Ask explicit confirmation before destructive operations.
 - Ask explicit confirmation before adding/removing/changing project or group members.
-- Ask explicit confirmation before unlinking connectors, deleting launchers/environments/sessions, or stopping sessions.
+- Ask explicit confirmation before unlinking or deleting connectors, deleting launchers/environments/sessions, or stopping sessions.
 - Never print secrets. The helper redacts token/password/secret-like fields.
 - Connector secrets are prompted interactively in v1.
 - Use `--yes` only after the user has explicitly confirmed.
@@ -142,7 +142,10 @@ python3 scripts/renku_agent.py connector list
 python3 scripts/renku_agent.py connector get <connector-id>
 python3 scripts/renku_agent.py connector link --connector <connector-id> --project <project-id>
 python3 scripts/renku_agent.py connector unlink --connector <connector-id> --link <link-id>
+python3 scripts/renku_agent.py connector delete <connector-id>   # for project-owned connectors
 ```
+
+Use `connector unlink` for non-owned linked/global connectors. If unlinking fails with "link to the owner project cannot be removed", the connector is project-owned; use `connector delete <connector-id>` after explicit confirmation.
 
 Create supported P0 connector types:
 

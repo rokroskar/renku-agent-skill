@@ -87,6 +87,18 @@ python3 scripts/renku_agent.py connector create polybox --name "Published result
 python3 scripts/renku_agent.py connector create polybox --name "Job output storage" --namespace <namespace/project-slug> --visibility private --access shared --url <public-link> --password <password> --target-path output --no-readonly
 ```
 
+To remove connectors, distinguish linked/global connectors from project-owned connectors:
+
+```bash
+# For a connector linked into a project from elsewhere:
+python3 scripts/renku_agent.py connector unlink --connector <connector-id> --link <link-id>
+
+# For a project-owned connector. This deletes the connector itself and requires confirmation:
+python3 scripts/renku_agent.py connector delete <connector-id>
+```
+
+If unlinking fails with "link to the owner project cannot be removed", the connector is project-owned and should be deleted instead of unlinked.
+
 ## Session launcher types
 
 Renku session launchers can use different environment sources.

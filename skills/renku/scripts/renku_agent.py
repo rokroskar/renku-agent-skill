@@ -764,6 +764,31 @@ def cmd_connector_unlink(args: argparse.Namespace) -> None:
     print_out(data, args, "Unlinked data connector")
 
 
+def cmd_connector_delete(args: argparse.Namespace) -> None:
+    try:
+        connector = http_json("GET", f"/data_connectors/{args.connector}")
+        name = connector.get("name") or args.connector
+        namespace = connector.get("namespace")
+        visibility = connector.get("visibility")
+        storage = connector.get("storage") or {}
+        target = storage.get("target_path")
+        detail = f"Delete data connector {name} ({args.connector})"
+        if namespace:
+            detail += f" from namespace {namespace}"
+        if visibility:
+            detail += f", visibility={visibility}"
+        if target:
+            detail += f", target_path={target}"
+        detail += "? This deletes project-owned connectors; use connector unlink for non-owned linked/global connectors."
+    except RenkuError:
+        detail = f"Delete data connector {args.connector}? This deletes project-owned connectors; use connector unlink for non-owned linked/global connectors."
+    confirm(args, detail)
+    if args.dry_run:
+        print_out({"DELETE": f"/data_connectors/{args.connector}"}, args); return
+    data = http_json("DELETE", f"/data_connectors/{args.connector}")
+    print_out(data, args, "Deleted data connector")
+
+
 def simple_crud(resource: str, path: str):
     def list_cmd(args): print_out(http_json("GET", path, query={"page": getattr(args, "page", None), "per_page": getattr(args, "per_page", None)}), args)
     def get_cmd(args): print_out(http_json("GET", f"{path}/{getattr(args, resource)}"), args)
@@ -997,6 +1022,7 @@ def main(argv=None) -> int:
     q=sp.add_parser("create"); q.add_argument("kind", choices=["doi","zenodo","dataverse","s3","polybox","switchdrive","webdav"]); q.add_argument("--name"); q.add_argument("--namespace"); q.add_argument("--slug"); q.add_argument("--visibility"); q.add_argument("--description"); q.add_argument("--target-path", default="data"); q.add_argument("--source-path"); q.add_argument("--doi"); q.add_argument("--url"); q.add_argument("--global", dest="global_connector", action="store_true"); q.add_argument("--bucket"); q.add_argument("--endpoint"); q.add_argument("--provider"); q.add_argument("--readonly", action="store_true", default=True); q.add_argument("--no-readonly", dest="readonly", action="store_false"); q.add_argument("--access", choices=["personal","shared"], default="personal"); q.add_argument("--username"); q.add_argument("--password", help="Connector password/token (or set RENKU_CONNECTOR_PASSWORD)"); q.add_argument("--access-key-id", help="S3 access key ID (or set RENKU_S3_ACCESS_KEY_ID)"); q.add_argument("--secret-access-key", help="S3 secret access key (or set RENKU_S3_SECRET_ACCESS_KEY)"); q.add_argument("--body"); q.add_argument("--payload"); q.set_defaults(func=cmd_connector_create)
     q=sp.add_parser("link"); q.add_argument("--connector", required=True); q.add_argument("--project", required=True); q.set_defaults(func=cmd_connector_link)
     q=sp.add_parser("unlink"); q.add_argument("--connector", required=True); q.add_argument("--link", required=True); q.set_defaults(func=cmd_connector_unlink)
+    q=sp.add_parser("delete"); q.add_argument("connector"); q.set_defaults(func=cmd_connector_delete)
 
     for name,path,key in [("launcher","/session_launchers","launcher"),("environment","/environments","environment")]:
         p=sub.add_parser(name); sp=p.add_subparsers(dest=f"{name}_cmd", required=True)
