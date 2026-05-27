@@ -58,12 +58,23 @@ Repositories are strings in the project's `repositories` array. Add/remove by fe
 
 ## Data connector then link to project
 
+DOI / Zenodo / Dataverse connectors are global. Create them with the DOI helper, then link the returned connector id to a project:
+
 ```bash
-python3 scripts/renku_agent.py connector create doi --name "Dataset" --doi "10.xxxx/..." --target-path /data --global
+python3 scripts/renku_agent.py connector create zenodo --doi "10.5281/zenodo.10058130"
 python3 scripts/renku_agent.py connector link --connector <connector-id> --project <project-id>
 ```
 
-For S3/Polybox/SWITCHdrive the helper prompts for secrets and redacts them from output. Data connector `target_path` values are relative to the session working directory, so use `zurich-air-quality-data` rather than `/zurich-air-quality-data`.
+Do not create DOI connectors by manually POSTing a payload with `namespace`; that creates a project-owned connector instead of a global DOI connector. The global DOI endpoint expects only `storage.configuration.{type,doi,provider}` plus storage fields and derives name/slug/target path from the DOI metadata.
+
+For S3/Polybox/SWITCHdrive the helper prompts for secrets and redacts them from output. Data connector `target_path` values are relative to the session working directory, so use `output` or `zurich-air-quality-data` rather than `/output` or `/zurich-air-quality-data`.
+
+For shared Polybox/SWITCHdrive connectors, the API expects `configuration.public_link` rather than `configuration.url`. Use the helper flags; for example:
+
+```bash
+python3 scripts/renku_agent.py connector create polybox --name "Published results" --namespace <namespace/project-slug> --visibility public --access shared --url <public-link> --target-path results --readonly
+python3 scripts/renku_agent.py connector create polybox --name "Job output storage" --namespace <namespace/project-slug> --visibility private --access shared --url <public-link> --password <password> --target-path output --no-readonly
+```
 
 ## Session launcher types
 

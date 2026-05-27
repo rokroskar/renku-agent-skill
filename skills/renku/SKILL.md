@@ -148,10 +148,11 @@ Create supported P0 connector types:
 
 ```bash
 # DOI / Zenodo / Dataverse — always global, no namespace needed.
-# Only --name, --doi (or --url), and --target-path are required.
-# The helper automatically routes to the global endpoint; do NOT pass --namespace or --global.
-python3 scripts/renku_agent.py connector create doi --name "Delhi air quality" --doi "10.5281/zenodo.1234567" --target-path air-quality-data
-python3 scripts/renku_agent.py connector create zenodo --name "Dataset" --url "https://zenodo.org/record/..." --target-path data
+# The helper automatically routes to /data_connectors/global and sends only the storage body.
+# Do NOT pass --namespace for DOI connectors; that would create a project-owned connector if using raw API.
+# Name/slug/visibility/target path are derived from DOI metadata by Renku for global DOI connectors.
+python3 scripts/renku_agent.py connector create doi --doi "10.5281/zenodo.1234567"
+python3 scripts/renku_agent.py connector create zenodo --doi "10.5281/zenodo.10058130"
 
 # S3/S3-compatible; prompts for secrets interactively, or set RENKU_S3_ACCESS_KEY_ID / RENKU_S3_SECRET_ACCESS_KEY
 python3 scripts/renku_agent.py connector create s3 --name "S3 Data" --bucket my-bucket --endpoint https://s3.example.org --target-path data
@@ -161,10 +162,12 @@ RENKU_S3_ACCESS_KEY_ID=... RENKU_S3_SECRET_ACCESS_KEY=... python3 scripts/renku_
 python3 scripts/renku_agent.py connector create s3 --name "Output" --bucket out-bucket --endpoint ... --no-readonly
 
 # Polybox / SWITCHdrive personal or shared
-# target paths are relative to the session working directory: use data, not /data
-# Secrets: --password flag or RENKU_CONNECTOR_PASSWORD env var; username via --username or RENKU_CONNECTOR_USERNAME
-python3 scripts/renku_agent.py connector create polybox --name "Polybox" --access personal --target-path data
-python3 scripts/renku_agent.py connector create switchdrive --name "Shared SWITCHdrive" --access shared --url <public-link> --target-path data
+# Target paths are relative to the session working directory: use output or data, not /output or /data.
+# Shared links must be sent as configuration.public_link, not configuration.url; the helper does this.
+# For a writable shared folder, pass --no-readonly and provide --password or RENKU_CONNECTOR_PASSWORD.
+python3 scripts/renku_agent.py connector create polybox --name "Published results" --namespace <namespace/project-slug> --visibility public --access shared --url <public-link> --target-path results --readonly
+python3 scripts/renku_agent.py connector create polybox --name "Job output storage" --namespace <namespace/project-slug> --visibility private --access shared --url <public-link> --password <password> --target-path output --no-readonly
+python3 scripts/renku_agent.py connector create switchdrive --name "Shared SWITCHdrive" --namespace <namespace/project-slug> --access shared --url <public-link> --target-path data
 
 # Generic WebDAV
 # URL via --url or RENKU_CONNECTOR_URL; credentials via --username/--password or RENKU_CONNECTOR_USERNAME/RENKU_CONNECTOR_PASSWORD

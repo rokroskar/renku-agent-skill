@@ -58,7 +58,7 @@ def choose_config_dir() -> Path:
 CONFIG_DIR = choose_config_dir()
 CREDS_FILE = CONFIG_DIR / "credentials.json"
 STATE_DIR = CONFIG_DIR / "state"
-REDACT_KEYS = {"access_token", "refresh_token", "id_token", "token", "password", "secret", "client_secret"}
+REDACT_KEYS = {"access_token", "refresh_token", "id_token", "token", "password", "secret", "client_secret", "pass"}
 
 
 class RenkuError(Exception):
@@ -667,16 +667,22 @@ def connector_storage(args: argparse.Namespace) -> dict[str, Any]:
         doi_or_url = args.doi or args.url
         if not doi_or_url:
             raise RenkuError(f"connector create {args.kind} requires --doi <DOI> or --url <URL>")
-        return {"storage_url": doi_or_url, "target_path": target, "readonly": True}
+        provider = args.provider
+        if not provider and args.kind in ("zenodo", "dataverse"):
+            provider = args.kind
+        cfg = {"type": "doi", "doi": doi_or_url}
+        if provider:
+            cfg["provider"] = provider
+        return {"configuration": cfg, "source_path": args.source_path or "/", "readonly": True}
     if args.kind == "s3":
         access_key = _prompt_input("S3 access key id: ", "RENKU_S3_ACCESS_KEY_ID", getattr(args, "access_key_id", None))
         secret_key = _prompt_secret("S3 secret access key: ", "RENKU_S3_SECRET_ACCESS_KEY", getattr(args, "secret_access_key", None))
         cfg = {"type": "s3", "provider": args.provider or "Other", "endpoint": args.endpoint or "", "access_key_id": access_key, "secret_access_key": secret_key}
         return {"configuration": cfg, "source_path": args.source_path or args.bucket or "/", "target_path": target, "readonly": args.readonly}
     if args.kind in ("polybox", "switchdrive"):
-        cfg = {"type": args.kind, "provider": args.access}
+        cfg = {"type": "switchDrive" if args.kind == "switchdrive" else "polybox", "provider": args.access}
         if args.access == "shared":
-            cfg["url"] = _prompt_input("Public/share link: ", "RENKU_CONNECTOR_URL", args.url)
+            cfg["public_link"] = _prompt_input("Public/share link: ", "RENKU_CONNECTOR_URL", args.url)
             pw = getattr(args, "password", None) or os.environ.get("RENKU_CONNECTOR_PASSWORD") or (
                 getpass.getpass("Share password (leave empty if none): ") if sys.stdin.isatty() else ""
             )
@@ -709,15 +715,20 @@ def cmd_connector_create(args: argparse.Namespace) -> None:
     if args.body or args.payload:
         body = read_body_arg(args)
     else:
-        if getattr(args, "kind", None) in ("doi", "zenodo", "dataverse"):
+        is_doi_connector = getattr(args, "kind", None) in ("doi", "zenodo", "dataverse")
+        if is_doi_connector:
             if getattr(args, "namespace", None):
                 print("Warning: --namespace is ignored for DOI/Zenodo/Dataverse connectors; they are always created as global connectors.", file=sys.stderr)
             args.global_connector = True
-        body = {"name": args.name, "storage": connector_storage(args)}
-        if not args.global_connector and args.namespace: body["namespace"] = args.namespace
-        if args.slug: body["slug"] = args.slug
-        if args.visibility: body["visibility"] = args.visibility
-        if args.description: body["description"] = args.description
+            # The global DOI endpoint derives name/slug/visibility/target_path from DOI metadata.
+            # It rejects project-owned fields such as name and namespace.
+            body = {"storage": connector_storage(args)}
+        else:
+            body = {"name": args.name, "storage": connector_storage(args)}
+            if args.namespace: body["namespace"] = args.namespace
+            if args.slug: body["slug"] = args.slug
+            if args.visibility: body["visibility"] = args.visibility
+            if args.description: body["description"] = args.description
     path = "/data_connectors/global" if args.global_connector else "/data_connectors"
     if args.dry_run:
         print_out({"POST": path, "body": redact(body)}, args); return
@@ -1013,8 +1024,8 @@ def main(argv=None) -> int:
         # Validate required unless JSON body supplied.
         if getattr(args, "cmd", None)=="project" and getattr(args,"project_cmd",None)=="create" and not (args.body or args.payload) and not (args.name and args.namespace):
             raise RenkuError("project create needs --name and --namespace, or --body/--payload")
-        if getattr(args, "cmd", None)=="connector" and getattr(args,"connector_cmd",None)=="create" and not (args.body or args.payload) and not args.name:
-            raise RenkuError("connector create needs --name, or --body/--payload")
+        if getattr(args, "cmd", None)=="connector" and getattr(args,"connector_cmd",None)=="create" and not (args.body or args.payload) and not args.name and getattr(args, "kind", None) not in ("doi", "zenodo", "dataverse"):
+            raise RenkuError("connector create needs --name for non-DOI connectors, or --body/--payload")
         args.func(args)
         return 0
     except RenkuError as e:
