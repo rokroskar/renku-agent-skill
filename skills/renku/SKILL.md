@@ -25,6 +25,21 @@ export RENKU_BASE_URL=https://dev.renku.ch
 
 The helper is dependency-free Python stdlib. It checks for the official Renku CLI as `rnk` and reports it in `doctor`. `rnk` is used for authentication (`rnk login`) and token import/reuse. All other operations — projects, connectors, launchers, sessions, and jobs — use the Renku Data Services API directly, giving richer behavior such as waiting for terminal states, removing failed job sessions before rerun, and URL enrichment.
 
+## Passing JSON payloads
+
+Prefer `--payload '{"key":"value"}'` (inline JSON string) over `--body FILE` — it avoids creating temporary files in the working directory. Most launcher, connector, and patch payloads fit on a single command line.
+
+**Never write temporary JSON files to the project root.** If a payload is genuinely too long for a command line (e.g. a job launcher with a long Python `-c` script), write it to `.pi/tmp/` which is gitignored, and delete it after use:
+
+```bash
+# Preferred: inline payload, no file created
+python3 scripts/renku_agent.py launcher create --payload '{"project_id":"01...","name":"JupyterLab","environment":{...}}'
+
+# Only when the payload is too long: write to .pi/tmp/ and clean up
+python3 scripts/renku_agent.py launcher patch <id> --body .pi/tmp/patch.json
+rm .pi/tmp/patch.json
+```
+
 ## Authentication
 
 Default auth prefers the official Renku CLI (`rnk login`) when `rnk` is available, then falls back to the helper's built-in OAuth device flow with public client `renku-cli`.
@@ -177,7 +192,7 @@ python3 scripts/renku_agent.py connector create switchdrive --name "Shared SWITC
 python3 scripts/renku_agent.py connector create webdav --name "WebDAV Store" --url https://dav.example.org --target-path data
 ```
 
-For exact payload control, use `--body FILE` or `--payload JSON`.
+For exact payload control, prefer `--payload JSON` (inline). Use `--body FILE` only when the JSON is too long; write to `.pi/tmp/` and delete after use.
 
 ### Launchers / Environments / Builds
 
@@ -242,13 +257,13 @@ Launcher and environment commands:
 python3 scripts/renku_agent.py launcher list
 python3 scripts/renku_agent.py launcher project-list --project <project-id>
 python3 scripts/renku_agent.py launcher get <launcher-id>
-python3 scripts/renku_agent.py launcher create --body launcher.json
-python3 scripts/renku_agent.py launcher patch <launcher-id> --body patch.json
+python3 scripts/renku_agent.py launcher create --payload '{"project_id":"01...","name":"...","environment":{...}}'
+python3 scripts/renku_agent.py launcher patch <launcher-id> --payload '{"name":"new name"}'
 python3 scripts/renku_agent.py launcher delete <launcher-id>
 
 python3 scripts/renku_agent.py environment list
 python3 scripts/renku_agent.py environment get <environment-id>
-python3 scripts/renku_agent.py environment create --body environment.json
+python3 scripts/renku_agent.py environment create --payload '{"name":"...","environment_image_source":"build",...}'
 
 python3 scripts/renku_agent.py build list --environment <environment-id>
 python3 scripts/renku_agent.py build start --environment <environment-id>
@@ -318,7 +333,7 @@ Confirm before deleting/stopping running interactive sessions unless the user ha
 
 ```bash
 python3 scripts/renku_agent.py api GET /projects
-python3 scripts/renku_agent.py api POST /projects --body project.json
+python3 scripts/renku_agent.py api POST /projects --payload '{"name":"...","namespace":"..."}'
 python3 scripts/renku_agent.py api PATCH /projects/<id> --payload '{"description":"new"}'
 ```
 

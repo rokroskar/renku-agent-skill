@@ -137,10 +137,10 @@ Use this when a linked Git repository contains dependency files or build hints. 
 }
 ```
 
-Then:
+Then pass the JSON inline with `--payload`. For a build-from-code launcher the payload fits on one line:
 
 ```bash
-python3 scripts/renku_agent.py launcher create --body launcher.json
+python3 scripts/renku_agent.py launcher create --payload '{"project_id":"01...","name":"JupyterLab from repository","description":"Builds from repo","environment":{"environment_image_source":"build","repository":"https://github.com/org/repo.git","builder_variant":"python","frontend_variant":"jupyterlab","repository_revision":"main","context_dir":".","platforms":["linux/amd64"]}}'
 ```
 
 Build-from-code launcher creation starts an image build. Use `build wait` rather than writing custom polling loops:
@@ -173,7 +173,7 @@ python3 scripts/renku_agent.py job wait <job-session-id>
 python3 scripts/renku_agent.py session logs <session-id>
 ```
 
-The session behaviour is determined by `launcher_type` on the launcher, not by the `POST /sessions` request. `job run` validates that the launcher has `launcher_type: non_interactive` before starting.
+The session behaviour is determined by the `session_type` field in the POST /sessions body. `job run` sends `session_type: "non-interactive"`; `session launch` sends `session_type: "interactive"`.
 
 Use `job wait` rather than writing custom polling loops. It polls status, prints concise log tails, and exits when the job reaches a terminal state:
 
@@ -233,10 +233,11 @@ For notebook batch execution, prefer a Python `-c` script over complex shell quo
 }
 ```
 
-Then:
+The Python `-c` argument is too long for an inline `--payload`. Write the patch to `.pi/tmp/` (gitignored) and remove it afterwards:
 
 ```bash
-python3 scripts/renku_agent.py launcher patch <launcher-id> --body job-launcher-patch.json
+python3 scripts/renku_agent.py launcher patch <launcher-id> --body .pi/tmp/job-launcher-patch.json
+rm .pi/tmp/job-launcher-patch.json
 python3 scripts/renku_agent.py session delete <old-failed-job-session> --yes   # if rerunning a failed/stopped job
 python3 scripts/renku_agent.py job run --launcher <launcher-id>
 python3 scripts/renku_agent.py job wait <job-session-name> --timeout 1800 --interval 10
