@@ -280,6 +280,11 @@ python3 scripts/renku_agent.py build wait <build-id>
 
 Use `build wait <build-id>` instead of writing ad-hoc polling loops. It polls the build status, prints concise build-log progress by default, and exits when the build reaches `succeeded`, `failed`, or `error`. This is preferred when users are waiting for build-from-code images because it reports what is happening, e.g. repository clone, dependency resolution, package installation, image export/push.
 
+**Code is mounted, not baked in.** When a session or job starts, Renku checks out the linked Git repository into the session at runtime (under `/home/renku/work/`). The built image contains only the environment (Python packages, system libraries, etc.). This means:
+
+- **No rebuild needed** when only code changes (notebooks, scripts, data processing files). Just rerun the job or launch a new session — the latest code from the repository is always fetched at start time.
+- **Rebuild required** only when dependency files change: `requirements.txt`, `pyproject.toml`, `environment.yml`, `renv.lock`, `Dockerfile`, or similar files that affect the installed packages or system environment.
+
 ### Sessions and Non-interactive Jobs
 
 Both interactive sessions and non-interactive jobs are started via `POST /sessions`. The session behaviour is determined by the `session_type` field in the POST /sessions body:

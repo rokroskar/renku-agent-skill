@@ -166,6 +166,15 @@ When the user provides a GitHub/GitLab repo and asks to base a Renku project on 
 4. Create a build-from-code session launcher for that repo.
 5. Optionally trigger a build or launch a session.
 
+**Code vs environment — when to rebuild:**
+
+Renku mounts the linked Git repository into the session at runtime (`/home/renku/work/<repo-name>`). The image contains only the installed environment, not the code. This means:
+
+- Code changes (notebooks, scripts) are picked up automatically on the next session/job start — **no rebuild needed**.
+- Rebuilds are only necessary when dependency files change (`requirements.txt`, `pyproject.toml`, `environment.yml`, `renv.lock`, etc.).
+
+If the user says they updated their notebooks or scripts and asks to rerun, just run `job run` or `session launch` with the existing launcher — do not trigger a new build.
+
 ## Non-interactive job
 
 ```bash
