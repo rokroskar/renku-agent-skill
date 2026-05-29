@@ -79,19 +79,30 @@ Claude Code discovers skills from a directory containing a `SKILL.md` file. The 
 **Global install** (available in all Claude Code sessions):
 
 ```bash
-git clone https://github.com/rokroskar/renku-agent-skill.git
-cp -R renku-agent-skill/skills/renku ~/.claude/skills/renku
+git clone https://github.com/rokroskar/renku-agent-skill.git ~/.claude/renku-agent-skill
+mkdir -p ~/.claude/skills
+ln -s ~/.claude/renku-agent-skill/skills/renku ~/.claude/skills/renku
 ```
 
 **Project-local install** (this project only):
 
 ```bash
-git clone https://github.com/rokroskar/renku-agent-skill.git
+git clone https://github.com/rokroskar/renku-agent-skill.git .agent-skills/renku-agent-skill
 mkdir -p .claude/skills
-cp -R renku-agent-skill/skills/renku .claude/skills/renku
+ln -s ../../.agent-skills/renku-agent-skill/skills/renku .claude/skills/renku
 ```
 
-Claude Code auto-discovers skills without restarting. Invoke with `/renku`, or just describe a Renku task in plain language — the skill's description is enough for Claude to load it automatically.
+**Updating to a new version:**
+
+```bash
+# Global:
+git -C ~/.claude/renku-agent-skill pull
+
+# Project-local:
+git -C .agent-skills/renku-agent-skill pull
+```
+
+Claude Code auto-discovers changes without restarting. Invoke with `/renku`, or just describe a Renku task in plain language — the skill's description is enough for Claude to load it automatically.
 
 The skill uses `${CLAUDE_SKILL_DIR}` to locate its helper script, so it works correctly regardless of the current working directory.
 
