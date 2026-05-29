@@ -702,10 +702,17 @@ def connector_storage(args: argparse.Namespace) -> dict[str, Any]:
         if args.access == "shared":
             cfg["public_link"] = _prompt_input("Public/share link: ", "RENKU_CONNECTOR_URL", args.url)
             pw = getattr(args, "password", None) or os.environ.get("RENKU_CONNECTOR_PASSWORD") or (
-                getpass.getpass("Share password (leave empty if none): ") if sys.stdin.isatty() else ""
+                getpass.getpass("Share password (leave empty if none): ") if sys.stdin.isatty() else None
             )
             if pw:
                 cfg["pass"] = pw
+            elif not sys.stdin.isatty() and getattr(args, "password", None) is None and not os.environ.get("RENKU_CONNECTOR_PASSWORD"):
+                print(
+                    "Warning: no password provided for shared connector (stdin is not a TTY). "
+                    "If this link is password-protected, set RENKU_CONNECTOR_PASSWORD in the "
+                    "environment before running this command.",
+                    file=sys.stderr,
+                )
         else:
             cfg["user"] = _prompt_input("Username: ", "RENKU_CONNECTOR_USERNAME", args.username)
             cfg["pass"] = _prompt_secret("Password/token: ", "RENKU_CONNECTOR_PASSWORD", getattr(args, "password", None))

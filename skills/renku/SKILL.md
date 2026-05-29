@@ -163,6 +163,51 @@ python3 scripts/renku_agent.py connector delete <connector-id>   # for project-o
 
 Use `connector unlink` for non-owned linked/global connectors. If unlinking fails with "link to the owner project cannot be removed", the connector is project-owned; use `connector delete <connector-id>` after explicit confirmation.
 
+#### Credentials for data connectors
+
+**Never pass credentials through the conversation or as CLI flags.** Credentials in CLI arguments appear in tool-call logs and conversation history. Instead, use environment variables that the user sets in their own terminal — they never transit the conversation.
+
+When a connector requires credentials (S3 keys, Polybox/SWITCHdrive password, WebDAV password):
+
+1. Tell the user which environment variable(s) to set.
+2. Ask them to type `! export VAR=value` in the chat prompt (the `!` prefix runs it in the session without it appearing as text).
+3. Wait for the user to confirm it is set.
+4. Run the connector-create command — no credentials appear in the command.
+
+Environment variable reference:
+
+| Connector type | Variable(s) |
+|---|---|
+| S3 access key ID | `RENKU_S3_ACCESS_KEY_ID` |
+| S3 secret access key | `RENKU_S3_SECRET_ACCESS_KEY` |
+| Polybox/SWITCHdrive/WebDAV username | `RENKU_CONNECTOR_USERNAME` |
+| Polybox/SWITCHdrive/WebDAV password | `RENKU_CONNECTOR_PASSWORD` |
+| Polybox/SWITCHdrive shared-link URL | `RENKU_CONNECTOR_URL` |
+
+Example — shared Polybox with a password:
+
+```text
+[agent to user] Please run the following in your terminal to set the connector password:
+  ! export RENKU_CONNECTOR_PASSWORD=<your-password>
+Let me know when it's done.
+```
+
+Then, once the user confirms:
+
+```bash
+python3 scripts/renku_agent.py connector create polybox \
+  --name "Job output storage" \
+  --namespace <namespace/project-slug> \
+  --visibility private \
+  --access shared \
+  --url <public-link> \
+  --target-path output \
+  --no-readonly
+# RENKU_CONNECTOR_PASSWORD is read from the environment; --password is never passed on the command line
+```
+
+**Important**: if the helper prints a warning that no password was provided for a shared connector (when stdin is not a TTY), it means the env var was not set before the command ran. Ask the user to set `RENKU_CONNECTOR_PASSWORD` and rerun.
+
 Create supported P0 connector types:
 
 ```bash
@@ -175,23 +220,21 @@ Create supported P0 connector types:
 python3 scripts/renku_agent.py connector create doi --doi "10.5281/zenodo.1234567"
 python3 scripts/renku_agent.py connector create zenodo --doi "10.5281/zenodo.10058130"
 
-# S3/S3-compatible; prompts for secrets interactively, or set RENKU_S3_ACCESS_KEY_ID / RENKU_S3_SECRET_ACCESS_KEY
+# S3/S3-compatible — set RENKU_S3_ACCESS_KEY_ID and RENKU_S3_SECRET_ACCESS_KEY before running.
+# Do NOT pass --access-key-id or --secret-access-key on the command line.
 python3 scripts/renku_agent.py connector create s3 --name "S3 Data" --bucket my-bucket --endpoint https://s3.example.org --target-path data
-# Non-interactive:
-RENKU_S3_ACCESS_KEY_ID=... RENKU_S3_SECRET_ACCESS_KEY=... python3 scripts/renku_agent.py connector create s3 ...
 # Writable S3 connector:
 python3 scripts/renku_agent.py connector create s3 --name "Output" --bucket out-bucket --endpoint ... --no-readonly
 
 # Polybox / SWITCHdrive personal or shared
 # Target paths are relative to the session working directory: use output or data, not /output or /data.
 # Shared links must be sent as configuration.public_link, not configuration.url; the helper does this.
-# For a writable shared folder, pass --no-readonly and provide --password or RENKU_CONNECTOR_PASSWORD.
+# For a writable shared folder, set RENKU_CONNECTOR_PASSWORD before running; do NOT pass --password inline.
 python3 scripts/renku_agent.py connector create polybox --name "Published results" --namespace <namespace/project-slug> --visibility public --access shared --url <public-link> --target-path results --readonly
-python3 scripts/renku_agent.py connector create polybox --name "Job output storage" --namespace <namespace/project-slug> --visibility private --access shared --url <public-link> --password <password> --target-path output --no-readonly
+python3 scripts/renku_agent.py connector create polybox --name "Job output storage" --namespace <namespace/project-slug> --visibility private --access shared --url <public-link> --target-path output --no-readonly
 python3 scripts/renku_agent.py connector create switchdrive --name "Shared SWITCHdrive" --namespace <namespace/project-slug> --access shared --url <public-link> --target-path data
 
-# Generic WebDAV
-# URL via --url or RENKU_CONNECTOR_URL; credentials via --username/--password or RENKU_CONNECTOR_USERNAME/RENKU_CONNECTOR_PASSWORD
+# Generic WebDAV — set RENKU_CONNECTOR_USERNAME and RENKU_CONNECTOR_PASSWORD before running.
 python3 scripts/renku_agent.py connector create webdav --name "WebDAV Store" --url https://dav.example.org --target-path data
 ```
 

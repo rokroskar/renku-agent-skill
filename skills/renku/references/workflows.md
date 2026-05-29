@@ -80,13 +80,16 @@ Do not create DOI connectors by manually POSTing a payload with `namespace`; tha
 
 The `target_path` (mount path) for DOI connectors is set by Renku from the DOI metadata — it is **not** `data/` or any other default. Always read `storage.target_path` from the creation response before referencing the data in a session or job. The helper prints it as `target_path: '<value>' (mount at /home/renku/work/<value>)`. If the connector already exists, run `connector get <id>` to retrieve it.
 
-For S3/Polybox/SWITCHdrive the helper prompts for secrets and redacts them from output. Data connector `target_path` values are relative to the session working directory, so use `output` or `zurich-air-quality-data` rather than `/output` or `/zurich-air-quality-data`.
+For S3/Polybox/SWITCHdrive the helper reads secrets from environment variables and redacts them from output. Data connector `target_path` values are relative to the session working directory, so use `output` or `zurich-air-quality-data` rather than `/output` or `/zurich-air-quality-data`.
+
+**Never pass connector credentials via `--password`, `--access-key-id`, or `--secret-access-key` flags.** Those values appear in tool-call logs and conversation history. Instead, ask the user to set the appropriate environment variable in their terminal (e.g. `! export RENKU_CONNECTOR_PASSWORD=...`), wait for confirmation, then run the command without the flag. See SKILL.md "Credentials for data connectors" for the full env-var reference and workflow.
 
 For shared Polybox/SWITCHdrive connectors, the API expects `configuration.public_link` rather than `configuration.url`. Use the helper flags; for example:
 
 ```bash
+# User sets RENKU_CONNECTOR_PASSWORD in their terminal before this command runs.
 python3 scripts/renku_agent.py connector create polybox --name "Published results" --namespace <namespace/project-slug> --visibility public --access shared --url <public-link> --target-path results --readonly
-python3 scripts/renku_agent.py connector create polybox --name "Job output storage" --namespace <namespace/project-slug> --visibility private --access shared --url <public-link> --password <password> --target-path output --no-readonly
+python3 scripts/renku_agent.py connector create polybox --name "Job output storage" --namespace <namespace/project-slug> --visibility private --access shared --url <public-link> --target-path output --no-readonly
 ```
 
 To remove connectors, distinguish linked/global connectors from project-owned connectors:
