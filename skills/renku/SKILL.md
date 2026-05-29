@@ -102,15 +102,17 @@ python3 scripts/renku_agent.py search "climate" --type project
 python3 scripts/renku_agent.py search "air quality" --page 2 --per-page 20
 ```
 
-Before launching sessions/jobs with non-default compute, inspect available resource pools/classes. Use classes where `matching: true`; these are accessible/schedulable for the current user and requested filters. For GPU jobs, look for classes with `gpu > 0` and names/affinities/tolerations indicating the desired GPU type, e.g. A10 or A100. Pass the selected class as `--resource-class-id <id>` to `session launch` or `job run`.
+**Always pick a resource class explicitly** before creating a launcher or running a session/job. Do not leave `resource_class_id` unset — the platform default may be undersized for the task, causing OOM failures or slow builds.
 
-If the user asks for a specific accelerator such as an A100 slice:
+```bash
+python3 scripts/renku_agent.py resource-classes --json
+```
 
-1. Run `resource-pools --json`.
-2. Find accessible (`matching: true`) classes with `gpu > 0`.
-3. Prefer a class whose `name`, `node_affinities`, or `tolerations` mention the requested accelerator.
-4. Report the selected class name/id/resources before launching.
-5. Use `job run --resource-class-id <id>` or `session launch --resource-class-id <id>`.
+1. Find classes where `matching: true` (accessible and schedulable for this user).
+2. For standard CPU work, pick the smallest `matching: true` class with enough CPU/RAM for the task (check the `cpu`, `memory`, and `storage` fields).
+3. For GPU work, filter for `gpu > 0` and match the requested accelerator by `name`, `node_affinities`, or `tolerations`.
+4. Include `resource_class_id` in the **launcher body** to set it as the default for all sessions/jobs from that launcher. It can also be overridden at launch time with `--resource-class-id <id>` on `session launch` or `job run`.
+5. Report the selected class name/id/CPU/memory/GPU to the user before creating the launcher.
 
 ### Projects
 
@@ -263,6 +265,7 @@ Build-from-code launcher body example:
   "project_id": "<project-id>",
   "name": "JupyterLab from repository",
   "description": "Builds a JupyterLab environment from the linked repository.",
+  "resource_class_id": <resource-class-id>,
   "environment": {
     "environment_image_source": "build",
     "repository": "https://github.com/org/repo.git",
@@ -281,6 +284,7 @@ Non-interactive job launcher body example (uses a pre-built image):
 {
   "project_id": "<project-id>",
   "name": "Run notebooks batch",
+  "resource_class_id": <resource-class-id>,
   "environment": {
     "name": "Run notebooks batch",
     "environment_image_source": "image",

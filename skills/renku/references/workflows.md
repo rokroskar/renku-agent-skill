@@ -23,14 +23,20 @@ Global flags may be placed before or after subcommands:
 
 ## Choosing resource classes
 
-Before launching sessions or jobs with non-default compute, inspect available resource pools/classes:
+Always inspect available resource classes before creating a launcher or running a session/job. Do not leave `resource_class_id` unset — the platform default may be undersized for the task.
 
 ```bash
 python3 scripts/renku_agent.py resource-pools --json
 python3 scripts/renku_agent.py resource-classes --json
 ```
 
-Use a class with `matching: true`. For GPU jobs, choose a class with `gpu > 0` and check its `name`, `node_affinities`, and `tolerations` for the requested accelerator type.
+Use a class with `matching: true`. For standard CPU work, pick the smallest `matching: true` class with enough CPU/RAM for the task. For GPU jobs, choose a class with `gpu > 0` and check its `name`, `node_affinities`, and `tolerations` for the requested accelerator type.
+
+Set `resource_class_id` in the **launcher body** to make the class the default for all sessions and jobs from that launcher. It can also be overridden at launch time:
+
+```bash
+python3 scripts/renku_agent.py job run --launcher <launcher-id> --resource-class-id <class-id>
+```
 
 Example decision process for “use an A100 slice”:
 
@@ -38,11 +44,7 @@ Example decision process for “use an A100 slice”:
 2. Filter to `matching: true` and `gpu > 0`.
 3. Prefer names like `A100`, `GPU - A100 20GB vRAM`, or affinities/tolerations mentioning A100/GPU partitioning.
 4. Tell the user which class will be used, including id, CPU, memory, GPU, and storage limits.
-5. Launch with:
-
-```bash
-python3 scripts/renku_agent.py job run --launcher <launcher-id> --resource-class-id <class-id>
-```
+5. Include `resource_class_id` in the launcher body or pass `--resource-class-id <id>` at launch time.
 
 ## Project with repository
 
@@ -130,6 +132,7 @@ Use this when a linked Git repository contains dependency files or build hints. 
   "project_id": "01...",
   "name": "JupyterLab from repository",
   "description": "Builds a JupyterLab environment from the linked repository.",
+  "resource_class_id": <resource-class-id>,
   "environment": {
     "environment_image_source": "build",
     "repository": "https://github.com/org/repo.git",
@@ -145,7 +148,7 @@ Use this when a linked Git repository contains dependency files or build hints. 
 Then pass the JSON inline with `--payload`. For a build-from-code launcher the payload fits on one line:
 
 ```bash
-python3 scripts/renku_agent.py launcher create --payload '{"project_id":"01...","name":"JupyterLab from repository","description":"Builds from repo","environment":{"environment_image_source":"build","repository":"https://github.com/org/repo.git","builder_variant":"python","frontend_variant":"jupyterlab","repository_revision":"main","context_dir":".","platforms":["linux/amd64"]}}'
+python3 scripts/renku_agent.py launcher create --payload '{"project_id":"01...","name":"JupyterLab from repository","description":"Builds from repo","resource_class_id":<resource-class-id>,"environment":{"environment_image_source":"build","repository":"https://github.com/org/repo.git","builder_variant":"python","frontend_variant":"jupyterlab","repository_revision":"main","context_dir":".","platforms":["linux/amd64"]}}'
 ```
 
 Build-from-code launcher creation starts an image build. Use `build wait` rather than writing custom polling loops:
