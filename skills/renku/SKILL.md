@@ -1,6 +1,7 @@
 ---
 name: renku
 description: Manage Renku/RenkuLab projects and assets. Use for Renku authentication, account/platform inspection, creating/listing projects, linking code repositories, managing data connectors, session launchers, environments/builds, interactive sessions, and non-interactive jobs on renkulab.io or another Renku deployment.
+allowed-tools: Bash(python3 *)
 ---
 
 # Renku
@@ -11,11 +12,11 @@ The skill is workflow-first. Prefer high-level commands in `scripts/renku_agent.
 
 ## Helper
 
-From the skill directory:
-
 ```bash
-python3 scripts/renku_agent.py --help
+python3 ${CLAUDE_SKILL_DIR}/scripts/renku_agent.py --help
 ```
+
+`${CLAUDE_SKILL_DIR}` resolves to the skill's installation directory regardless of the current working directory. All examples below use `scripts/renku_agent.py` as shorthand; always prefix with `${CLAUDE_SKILL_DIR}/` when running commands.
 
 Default instance is `https://renkulab.io`. Override with:
 

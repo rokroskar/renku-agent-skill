@@ -74,26 +74,26 @@ Then reload pi or start a new session. The skill should be available as:
 
 ### Claude Code
 
-Claude Code discovers skills from per-skill folders containing a `SKILL.md` file. Install globally for your user:
+Claude Code discovers skills from a directory containing a `SKILL.md` file. The directory name becomes the `/renku` slash command.
+
+**Global install** (available in all Claude Code sessions):
 
 ```bash
 git clone https://github.com/rokroskar/renku-agent-skill.git
-mkdir -p ~/.claude/skills
 cp -R renku-agent-skill/skills/renku ~/.claude/skills/renku
 ```
 
-Or install only for one project by copying the skill into that project's Claude directory:
+**Project-local install** (this project only):
 
 ```bash
+git clone https://github.com/rokroskar/renku-agent-skill.git
 mkdir -p .claude/skills
-cp -R /path/to/renku-agent-skill/skills/renku .claude/skills/renku
+cp -R renku-agent-skill/skills/renku .claude/skills/renku
 ```
 
-Restart Claude Code or start a new session. The skill should be available as:
+Claude Code auto-discovers skills without restarting. Invoke with `/renku`, or just describe a Renku task in plain language — the skill's description is enough for Claude to load it automatically.
 
-```text
-/skill:renku
-```
+The skill uses `${CLAUDE_SKILL_DIR}` to locate its helper script, so it works correctly regardless of the current working directory.
 
 ### Codex CLI
 
