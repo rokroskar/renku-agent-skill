@@ -229,9 +229,10 @@ After the build succeeds, create a **separate** launcher for the job (preserving
 1. Get the launcher and confirm the build succeeded.
 2. Use the built `environment.container_image` as the fixed image.
 3. Set `environment_image_source` to `image`, `environment_kind` to `CUSTOM`.
-4. Set `command` to `["/cnb/lifecycle/launcher"]` so the CNB launch environment is initialized correctly.
-5. Set `args` to the batch command.
-6. Run with `job run --launcher <launcher-id>` — this sets `session_type: "non-interactive"` at launch time.
+4. Set `"name"` inside the environment object — the API requires it and returns 422 without it.
+5. Set `command` to `["/cnb/lifecycle/launcher"]` so the CNB launch environment is initialized correctly.
+6. Set `args` to the batch command. Reference scripts by absolute path: the repo is cloned to `{mount_directory}/{repo-slug}/` (e.g. `/home/renku/work/my-repo/`). Keep `working_directory == mount_directory == /home/renku/work`; mismatching them causes a double-nested checkout like `/home/renku/work/my-repo/my-repo/`.
+7. Run with `job run --launcher <launcher-id>` — this sets `session_type: "non-interactive"` at launch time.
 
 For notebook batch execution, prefer a Python `-c` script over complex shell quoting. Example launcher patch:
 

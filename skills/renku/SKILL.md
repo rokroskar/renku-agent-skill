@@ -282,6 +282,7 @@ Non-interactive job launcher body example (uses a pre-built image):
   "project_id": "<project-id>",
   "name": "Run notebooks batch",
   "environment": {
+    "name": "Run notebooks batch",
     "environment_image_source": "image",
     "environment_kind": "CUSTOM",
     "container_image": "<built-image>",
@@ -293,7 +294,18 @@ Non-interactive job launcher body example (uses a pre-built image):
 }
 ```
 
-For any launcher using a custom image (`environment_kind: "CUSTOM"`), both `working_directory` and `mount_directory` must be set. For images built on Renku (including all build-from-code outputs) use `/home/renku/work` for both — this is where the project data connector is mounted and where notebooks expect to find their working tree.
+For any launcher using a custom image (`environment_kind: "CUSTOM"`):
+- The `environment` object requires a `"name"` field — omitting it returns HTTP 422.
+- Both `working_directory` and `mount_directory` must be set; use `/home/renku/work` for both on Renku-built images.
+
+**Repository checkout path in sessions and jobs.** Renku always clones the linked repository to `{mount_directory}/{repo-slug}/` at session/job start — it does not use `working_directory` as the checkout root. Keep `working_directory == mount_directory == /home/renku/work` to avoid a double-nested path like `/home/renku/work/my-repo/my-repo/`. Reference scripts and notebooks by their full path:
+
+```text
+/home/renku/work/<repo-slug>/notebooks/analysis.ipynb
+/home/renku/work/<repo-slug>/scripts/run.py
+```
+
+Data connectors are mounted at `/home/renku/work/<target_path>/`, alongside the repository checkout.
 
 Known build variants/frontends:
 
@@ -373,10 +385,11 @@ To run a batch job using an image built by a build-from-code launcher:
 1. Wait for the build to succeed and note the `environment.container_image` URI.
 2. Create a new launcher (or patch the existing one) with:
    - `environment_image_source: "image"` and `environment_kind: "CUSTOM"`
+   - `"name"` field inside the `environment` object (required — 422 without it)
    - `container_image` set to the built image URI
-   - `working_directory: "/home/renku/work"` and `mount_directory: "/home/renku/work"` (required for custom images; this is where data connectors are mounted)
+   - `working_directory: "/home/renku/work"` and `mount_directory: "/home/renku/work"` (required for custom images; both must match to avoid a double-nested checkout path)
    - `command: ["/cnb/lifecycle/launcher"]` to initialize the CNB launch environment
-   - `args` set to the batch command (prefer `python -c` for notebook execution)
+   - `args` that reference scripts by absolute path, e.g. `python /home/renku/work/<repo-slug>/script.py` — the repo is checked out at `{mount_directory}/{repo-slug}/`, not at `working_directory` directly
 3. Run with `job run --launcher <launcher-id>` — this sets `session_type: "non-interactive"` at launch time.
 
 If preserving the original interactive launcher matters, create a separate launcher instead of patching it in place. See `references/workflows.md` for a full example.

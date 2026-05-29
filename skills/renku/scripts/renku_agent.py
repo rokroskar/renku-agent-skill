@@ -550,9 +550,9 @@ def _project_fetch(ident: str) -> tuple[dict[str, Any], str, str]:
     """Return (project_data, project_id, etag). Raises RenkuError if ETag is missing."""
     proj, resp_headers = http_json("GET", _project_api_path(ident), return_headers=True)
     proj_id = proj.get("id") or ident
-    etag = resp_headers.get("ETag") or resp_headers.get("etag")
+    etag = resp_headers.get("ETag") or resp_headers.get("etag") or proj.get("etag")
     if not etag:
-        raise RenkuError(f"Project GET response did not include an ETag header; cannot PATCH safely")
+        raise RenkuError(f"Project GET response did not include an ETag (checked headers and body); cannot PATCH safely")
     return proj, proj_id, etag
 
 
@@ -691,7 +691,7 @@ def connector_storage(args: argparse.Namespace) -> dict[str, Any]:
         cfg = {"type": "doi", "doi": doi_or_url}
         if provider:
             cfg["provider"] = provider
-        return {"configuration": cfg, "source_path": args.source_path or "/", "readonly": True}
+        return {"configuration": cfg, "source_path": args.source_path or "/", "target_path": target, "readonly": True}
     if args.kind == "s3":
         access_key = _prompt_input("S3 access key id: ", "RENKU_S3_ACCESS_KEY_ID", getattr(args, "access_key_id", None))
         secret_key = _prompt_secret("S3 secret access key: ", "RENKU_S3_SECRET_ACCESS_KEY", getattr(args, "secret_access_key", None))
@@ -973,6 +973,19 @@ def cmd_session_wait(args: argparse.Namespace) -> None:
         if state in terminal:
             print_out(session, args)
             if state not in success:
+                if not args.json:
+                    try:
+                        logs = http_json("GET", f"/sessions/{args.session}/logs")
+                        if isinstance(logs, dict):
+                            # Print amalthea-session first (main container), then the rest.
+                            ordered_keys = sorted(logs.keys(), key=lambda k: (k != "amalthea-session", k))
+                            for container in ordered_keys:
+                                print(f"\n--- logs: {container} ---")
+                                print(str(logs[container]).strip())
+                        else:
+                            print(str(logs).strip())
+                    except Exception as log_err:
+                        print(f"(could not fetch logs: {log_err})")
                 raise RenkuError(f"Session/job {args.session} ended with state: {state}")
             return
         last_state = state
@@ -1047,8 +1060,8 @@ def main(argv=None) -> int:
         funcs=simple_crud(key,path)
         q=sp.add_parser("list"); q.add_argument("--page", type=int); q.add_argument("--per-page", type=int); q.set_defaults(func=funcs[0])
         q=sp.add_parser("get"); q.add_argument(key); q.set_defaults(func=funcs[1])
-        q=sp.add_parser("create"); q.add_argument("--body", required=True); q.add_argument("--payload"); q.set_defaults(func=funcs[2])
-        q=sp.add_parser("patch"); q.add_argument(key); q.add_argument("--body", required=True); q.add_argument("--payload"); q.set_defaults(func=funcs[3])
+        q=sp.add_parser("create"); q.add_argument("--body"); q.add_argument("--payload"); q.set_defaults(func=funcs[2])
+        q=sp.add_parser("patch"); q.add_argument(key); q.add_argument("--body"); q.add_argument("--payload"); q.set_defaults(func=funcs[3])
         q=sp.add_parser("delete"); q.add_argument(key); q.set_defaults(func=funcs[4])
         if name == "launcher":
             q=sp.add_parser("project-list"); q.add_argument("--project", required=True); q.set_defaults(func=cmd_launcher_project_list)
