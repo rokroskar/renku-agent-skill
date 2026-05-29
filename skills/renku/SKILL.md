@@ -337,6 +337,18 @@ To run a batch job using an image built by a build-from-code launcher:
 
 If preserving the original interactive launcher matters, create a separate launcher instead of patching it in place. See `references/workflows.md` for a full example.
 
+**rclone sync delay.** Output data connectors are mounted via rclone, which buffers writes and syncs to the backend asynchronously. If the job process exits before rclone finishes syncing, output files can be silently lost. Always add a delay at the very end of job scripts that write to a mounted output connector:
+
+```python
+import os, time
+# ... all file writes happen here ...
+os.sync()  # flush kernel page cache so rclone can pick up writes
+print("Outputs written, waiting for rclone sync...", flush=True)
+time.sleep(60)  # increase to 120+ for outputs larger than ~1 GB
+```
+
+Write a small sentinel/marker file as the last real output before the sleep. This ensures the sleep follows all writes rather than running concurrently with them. The delay must be part of the job's `args` script, not added externally.
+
 Before rerunning a non-interactive job from the same launcher/project, check for an existing failed/stopped job session with the same session name. Remove failed job sessions before starting a new one, otherwise Renku may reuse or conflict with the previous failed session. Deleting failed/stopped job sessions is allowed when the user explicitly asks to rerun the job; mention what is being removed.
 
 Confirm before deleting/stopping running interactive sessions unless the user has already explicitly approved.

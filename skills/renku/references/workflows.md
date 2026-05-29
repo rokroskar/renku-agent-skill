@@ -192,6 +192,17 @@ Use `job wait` rather than writing custom polling loops. It polls status, prints
 python3 scripts/renku_agent.py job wait <job-session-id> --timeout 1800 --interval 10
 ```
 
+**rclone sync delay.** Output connectors are mounted via rclone, which syncs writes to the backend asynchronously. If the job exits before rclone finishes, output files are silently lost. Always end job scripts that write to an output connector with:
+
+```python
+import os, time
+os.sync()
+print("Outputs written, waiting for rclone sync...", flush=True)
+time.sleep(60)  # increase to 120+ for outputs > ~1 GB
+```
+
+Write a sentinel/completion file as the last real output before the sleep so the delay always follows all writes.
+
 Before rerunning a job, remove the previous failed/stopped job session from the same launcher/project. Renku may reuse or conflict with an existing failed job session name. If the user asks to rerun a failed job, it is acceptable to delete the failed job session first, while clearly stating which session is being removed.
 
 ## Convert a build-from-code launcher into a job launcher
@@ -238,7 +249,7 @@ For notebook batch execution, prefer a Python `-c` script over complex shell quo
     "args": [
       "python",
       "-c",
-      "import pathlib, subprocess; root=pathlib.Path('/home/renku/work'); repo=root/'<repo-dir>'; outroot=root/'output-data'/'executed-notebooks'; nbs=[p for p in repo.rglob('*.ipynb') if '.ipynb_checkpoints' not in p.parts]; print('Notebooks:', [str(p.relative_to(repo)) for p in nbs], flush=True); assert nbs, 'No notebooks found'; [(lambda nb, rel: ((outroot/rel.parent).mkdir(parents=True, exist_ok=True), print(f'Executing {nb} -> {outroot/rel}', flush=True), subprocess.run(['jupyter','nbconvert','--to','notebook','--execute',str(nb),'--output-dir',str(outroot/rel.parent),'--output',rel.name,'--ExecutePreprocessor.timeout=1200'], check=True)))(nb, nb.relative_to(repo)) for nb in nbs]"
+      "import os, pathlib, subprocess, time; root=pathlib.Path('/home/renku/work'); repo=root/'<repo-dir>'; outroot=root/'output-data'/'executed-notebooks'; nbs=[p for p in repo.rglob('*.ipynb') if '.ipynb_checkpoints' not in p.parts]; print('Notebooks:', [str(p.relative_to(repo)) for p in nbs], flush=True); assert nbs, 'No notebooks found'; [(lambda nb, rel: ((outroot/rel.parent).mkdir(parents=True, exist_ok=True), print(f'Executing {nb} -> {outroot/rel}', flush=True), subprocess.run(['jupyter','nbconvert','--to','notebook','--execute',str(nb),'--output-dir',str(outroot/rel.parent),'--output',rel.name,'--ExecutePreprocessor.timeout=1200'], check=True)))(nb, nb.relative_to(repo)) for nb in nbs]; (outroot/'done.txt').write_text('done'); os.sync(); print('Waiting for rclone sync...', flush=True); time.sleep(60)"
     ]
   }
 }
