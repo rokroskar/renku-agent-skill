@@ -499,13 +499,12 @@ def launcher_create(
 
     Always call resource_classes() first and pass an appropriate resource_class_id.
 
-    The environment dict must include at minimum:
-      - name (str, required — 422 without it)
-      - description (str, recommended)
-      - environment_image_source: 'build' or 'image'
-    For 'build': also repository, builder_variant, frontend_variant, repository_revision, context_dir, platforms.
-    For 'image': also environment_kind='CUSTOM', container_image, working_directory='/home/renku/work',
-      mount_directory='/home/renku/work', command=['/cnb/lifecycle/launcher'], args, port, uid, gid.
+    The environment dict must include environment_image_source: 'build' or 'image'.
+    For 'build': repository, builder_variant, frontend_variant (required);
+      repository_revision, context_dir, platforms (optional). Do NOT include 'name'.
+    For 'image': name, environment_kind='CUSTOM', container_image,
+      working_directory='/home/renku/work', mount_directory='/home/renku/work',
+      command=['/cnb/lifecycle/launcher'], args, port, uid, gid.
 
     Args:
         project_id: Project ID.
@@ -514,7 +513,9 @@ def launcher_create(
         environment: Environment definition dict.
         description: Optional launcher description.
     """
-    if "name" not in environment:
+    # 'name' is required for image-source environments but rejected by the
+    # BuildParametersPost schema used for build-source environments.
+    if environment.get("environment_image_source") != "build" and "name" not in environment:
         environment = {"name": name, **environment}
     body: dict[str, Any] = {
         "project_id": project_id,
