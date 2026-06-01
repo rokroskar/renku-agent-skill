@@ -298,11 +298,53 @@ Non-interactive job launcher body example (uses a pre-built image):
 }
 ```
 
-For any launcher using a custom image (`environment_kind: "CUSTOM"`):
-- The `environment` object requires both `"name"` and `"description"` fields — omitting `"name"` returns HTTP 422.
-- Both `working_directory` and `mount_directory` must be set; use `/home/renku/work` for both on Renku-built images.
-- For CNB/Renku-built images, use `"command": ["/cnb/lifecycle/launcher"]`.
-- The known-good full environment shape for a custom-image launcher:
+#### Launcher payload schema
+
+The `launcher create` and `launcher patch` commands validate payloads locally before sending. Hard errors (missing required fields, `working_directory != mount_directory`) are caught before the API call. Soft warnings (missing `resource_class_id`, missing `description`) are printed to stderr.
+
+**Top-level launcher object:**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `project_id` | string | create only | |
+| `name` | string | create only | |
+| `resource_class_id` | integer | recommended | Always set; omitting causes a warning. Run `resource-classes --json` first. |
+| `description` | string | optional | |
+| `environment` | object | create only | See environment schema below. |
+
+**`environment` object — `environment_image_source: "image"` (custom image):**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `name` | string | **yes** | 422 if missing |
+| `description` | string | recommended | May be required on some deployments |
+| `environment_image_source` | `"image"` | **yes** | |
+| `environment_kind` | `"CUSTOM"` | **yes** | |
+| `container_image` | string | **yes** | Full image URI |
+| `working_directory` | string | **yes** | Must equal `mount_directory`; use `/home/renku/work` |
+| `mount_directory` | string | **yes** | Must equal `working_directory`; use `/home/renku/work` |
+| `command` | array | yes (CNB) | `["/cnb/lifecycle/launcher"]` for Renku-built images |
+| `args` | array | yes | Startup command array, e.g. `["bash", "-lc", "streamlit run ..."]` |
+| `port` | integer | recommended | Default `8080` for web apps |
+| `default_url` | string | optional | Default `"/"` |
+| `uid` | integer | optional | Default `1000` |
+| `gid` | integer | optional | Default `1000` |
+| `strip_path_prefix` | boolean | optional | Default `false` — app handles base URL path itself |
+
+**`environment` object — `environment_image_source: "build"` (build from code):**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `name` | string | **yes** | 422 if missing |
+| `environment_image_source` | `"build"` | **yes** | |
+| `repository` | string | **yes** | Git repo URL |
+| `builder_variant` | string | **yes** | `"python"` or `"r"` |
+| `frontend_variant` | string | **yes** | `"jupyterlab"`, `"rstudio"`, `"vscodium"`, `"ttyd"` |
+| `repository_revision` | string | optional | Default `"main"` |
+| `context_dir` | string | optional | Default `"."` |
+| `platforms` | array | optional | Default `["linux/amd64"]` |
+
+The known-good full environment shape for a custom-image launcher:
 
 ```json
 {

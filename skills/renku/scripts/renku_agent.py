@@ -848,10 +848,51 @@ def _print_launcher_handoff(data: dict[str, Any], args: argparse.Namespace) -> N
         print("\n".join(lines))
 
 
+def _validate_launcher_body(body: dict[str, Any], *, patch: bool = False) -> None:
+    """Raise RenkuError for known 422-causing mistakes; warn to stderr for common pitfalls."""
+    env = body.get("environment")
+    if env is None:
+        if not patch:
+            raise RenkuError("launcher body must include an 'environment' object")
+        return  # partial patch without environment — nothing to validate
+
+    if not env.get("name"):
+        raise RenkuError(
+            "environment.name is required (API returns 422 without it). "
+            "Add \"name\": \"<launcher name>\" inside the environment object."
+        )
+    if not patch and not env.get("description"):
+        print("Warning: environment.description is missing (recommended; may be required on some deployments).", file=sys.stderr)
+    if not patch and not body.get("resource_class_id"):
+        print("Warning: resource_class_id is not set. Run 'resource-classes --json' and choose a matching class.", file=sys.stderr)
+
+    source = env.get("environment_image_source")
+    if source == "image":
+        if not env.get("container_image"):
+            raise RenkuError("environment.container_image is required when environment_image_source is 'image'.")
+        wd, md = env.get("working_directory"), env.get("mount_directory")
+        if not wd or not md:
+            print(
+                "Warning: working_directory and mount_directory should both be '/home/renku/work' "
+                "for custom image launchers.",
+                file=sys.stderr,
+            )
+        elif wd != md:
+            raise RenkuError(
+                f"working_directory ({wd!r}) != mount_directory ({md!r}). "
+                "They must be equal — mismatching values cause a double-nested repo checkout. "
+                "Set both to '/home/renku/work'."
+            )
+    elif source == "build":
+        if not env.get("repository"):
+            raise RenkuError("environment.repository is required when environment_image_source is 'build'.")
+
+
 def cmd_launcher_create(args: argparse.Namespace) -> None:
     body = read_body_arg(args)
     if getattr(args, "resource_class_id", None) is not None:
         body["resource_class_id"] = args.resource_class_id
+    _validate_launcher_body(body)
     if args.dry_run:
         print_out({"POST": "/session_launchers", "body": body}, args); return
     _print_launcher_handoff(http_json("POST", "/session_launchers", body), args)
@@ -863,6 +904,7 @@ def cmd_launcher_patch(args: argparse.Namespace) -> None:
         body["resource_class_id"] = args.resource_class_id
     if not body:
         raise RenkuError("launcher patch needs --body, --payload, or --resource-class-id")
+    _validate_launcher_body(body, patch=True)
     lid = getattr(args, "launcher", "")
     if args.dry_run:
         print_out({"PATCH": f"/session_launchers/{lid}", "body": body}, args); return
