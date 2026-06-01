@@ -122,28 +122,21 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 python3 skills/renku/scripts/renku_agent.py auth login
 ```
 
-**Register in Claude Code** (`~/.claude/settings.json` for global, or `.claude/settings.json` for project-local). Claude starts the server automatically:
+**Register in Claude Code** using `claude mcp add` (stores in `~/.claude.json`, available in all sessions):
 
-```json
-{
-  "mcpServers": {
-    "renku": {
-      "command": "uv",
-      "args": ["run", "/path/to/renku-agent-skill/mcp/server.py"]
-    }
-  }
-}
+```bash
+claude mcp add renku -- uv run /path/to/renku-agent-skill/mcp/server.py
 ```
 
 For a non-default deployment, or to pass connector credentials (they stay in local config, never in conversations):
 
-```json
-"env": {
-  "RENKU_BASE_URL": "https://dev.renku.ch",
-  "RENKU_S3_ACCESS_KEY_ID": "...",
-  "RENKU_S3_SECRET_ACCESS_KEY": "...",
-  "RENKU_CONNECTOR_PASSWORD": "..."
-}
+```bash
+claude mcp add renku \
+  -e RENKU_BASE_URL=https://dev.renku.ch \
+  -e RENKU_S3_ACCESS_KEY_ID=... \
+  -e RENKU_S3_SECRET_ACCESS_KEY=... \
+  -e RENKU_CONNECTOR_PASSWORD=... \
+  -- uv run /path/to/renku-agent-skill/mcp/server.py
 ```
 
 **Update:**

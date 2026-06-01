@@ -47,33 +47,28 @@ uv run mcp/server.py
 
 ## Claude Code integration
 
-Add to `~/.claude/settings.json` (global) or `.claude/settings.json` (project-local):
+Use the `claude mcp add` command — it writes to `~/.claude.json` which Claude Code always reads:
 
-```json
-{
-  "mcpServers": {
-    "renku": {
-      "command": "uv",
-      "args": ["run", "/absolute/path/to/renku-agent-skill/mcp/server.py"]
-    }
-  }
-}
+```bash
+claude mcp add renku -- uv run /absolute/path/to/renku-agent-skill/mcp/server.py
 ```
 
-For a non-default Renku deployment, add `RENKU_BASE_URL` to `env`:
+For a non-default Renku deployment, pass `RENKU_BASE_URL` via `-e`:
 
-```json
-{
-  "mcpServers": {
-    "renku": {
-      "command": "uv",
-      "args": ["run", "/absolute/path/to/renku-agent-skill/mcp/server.py"],
-      "env": {
-        "RENKU_BASE_URL": "https://dev.renku.ch"
-      }
-    }
-  }
-}
+```bash
+claude mcp add renku -e RENKU_BASE_URL=https://dev.renku.ch -- uv run /absolute/path/to/renku-agent-skill/mcp/server.py
+```
+
+To verify it's registered:
+
+```bash
+claude mcp list
+```
+
+To remove it:
+
+```bash
+claude mcp remove renku
 ```
 
 ## Passing connector credentials safely
