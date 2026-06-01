@@ -829,6 +829,46 @@ def cmd_launcher_project_list(args: argparse.Namespace) -> None:
     print_out(http_json("GET", f"/projects/{args.project}/session_launchers"), args)
 
 
+def _print_launcher_handoff(data: dict[str, Any], args: argparse.Namespace) -> None:
+    print_out(data, args)
+    if not args.json and not args.quiet:
+        env = data.get("environment") or {}
+        lines = [
+            f"  launcher id       : {data.get('id', '—')}",
+            f"  environment id    : {env.get('id', '—')}",
+            f"  resource_class_id : {data.get('resource_class_id', '—')}",
+            f"  container_image   : {env.get('container_image', '—')}",
+            f"  port              : {env.get('port', '—')}",
+        ]
+        if env.get("command"):
+            lines.append(f"  command           : {env['command']}")
+        if env.get("args"):
+            lines.append(f"  args              : {env['args']}")
+        print("--- launcher handoff ---")
+        print("\n".join(lines))
+
+
+def cmd_launcher_create(args: argparse.Namespace) -> None:
+    body = read_body_arg(args)
+    if getattr(args, "resource_class_id", None) is not None:
+        body["resource_class_id"] = args.resource_class_id
+    if args.dry_run:
+        print_out({"POST": "/session_launchers", "body": body}, args); return
+    _print_launcher_handoff(http_json("POST", "/session_launchers", body), args)
+
+
+def cmd_launcher_patch(args: argparse.Namespace) -> None:
+    body = read_body_arg(args) if (getattr(args, "body", None) or getattr(args, "payload", None)) else {}
+    if getattr(args, "resource_class_id", None) is not None:
+        body["resource_class_id"] = args.resource_class_id
+    if not body:
+        raise RenkuError("launcher patch needs --body, --payload, or --resource-class-id")
+    lid = getattr(args, "launcher", "")
+    if args.dry_run:
+        print_out({"PATCH": f"/session_launchers/{lid}", "body": body}, args); return
+    _print_launcher_handoff(http_json("PATCH", f"/session_launchers/{lid}", body), args)
+
+
 def add_iframe_url(session: dict[str, Any]) -> dict[str, Any]:
     try:
         project_id = session.get("project_id")
@@ -934,6 +974,20 @@ def cmd_session_delete(args: argparse.Namespace) -> None:
     if args.dry_run:
         print_out({"DELETE": f"/sessions/{args.session}"}, args); return
     print_out(http_json("DELETE", f"/sessions/{args.session}"), args, "Session deleted")
+
+
+def cmd_session_delete_if_failed(args: argparse.Namespace) -> None:
+    session = http_json("GET", f"/sessions/{args.session}")
+    status = session.get("status") or {}
+    state = status.get("state") or session.get("state") or "unknown"
+    if state not in {"failed", "error", "stopped"}:
+        print(f"Session {args.session} is in state '{state}' (not failed/error/stopped) — skipping delete.")
+        return
+    confirm(args, f"Delete session {args.session} (state: {state})?")
+    if args.dry_run:
+        print_out({"DELETE": f"/sessions/{args.session}"}, args); return
+    http_json("DELETE", f"/sessions/{args.session}")
+    print(f"Deleted session {args.session} (was {state})")
 
 
 def extract_log_tail(logs: Any, lines: int = 5) -> str:
@@ -1060,8 +1114,12 @@ def main(argv=None) -> int:
         funcs=simple_crud(key,path)
         q=sp.add_parser("list"); q.add_argument("--page", type=int); q.add_argument("--per-page", type=int); q.set_defaults(func=funcs[0])
         q=sp.add_parser("get"); q.add_argument(key); q.set_defaults(func=funcs[1])
-        q=sp.add_parser("create"); q.add_argument("--body"); q.add_argument("--payload"); q.set_defaults(func=funcs[2])
-        q=sp.add_parser("patch"); q.add_argument(key); q.add_argument("--body"); q.add_argument("--payload"); q.set_defaults(func=funcs[3])
+        if name == "launcher":
+            q=sp.add_parser("create"); q.add_argument("--body"); q.add_argument("--payload"); q.add_argument("--resource-class-id", type=int); q.set_defaults(func=cmd_launcher_create)
+            q=sp.add_parser("patch"); q.add_argument(key); q.add_argument("--body"); q.add_argument("--payload"); q.add_argument("--resource-class-id", type=int); q.set_defaults(func=cmd_launcher_patch)
+        else:
+            q=sp.add_parser("create"); q.add_argument("--body"); q.add_argument("--payload"); q.set_defaults(func=funcs[2])
+            q=sp.add_parser("patch"); q.add_argument(key); q.add_argument("--body"); q.add_argument("--payload"); q.set_defaults(func=funcs[3])
         q=sp.add_parser("delete"); q.add_argument(key); q.set_defaults(func=funcs[4])
         if name == "launcher":
             q=sp.add_parser("project-list"); q.add_argument("--project", required=True); q.set_defaults(func=cmd_launcher_project_list)
@@ -1079,6 +1137,7 @@ def main(argv=None) -> int:
     q=sp.add_parser("get"); q.add_argument("session"); q.set_defaults(func=cmd_session_get)
     q=sp.add_parser("logs"); q.add_argument("session"); q.set_defaults(func=cmd_session_logs)
     q=sp.add_parser("delete"); q.add_argument("session"); q.set_defaults(func=cmd_session_delete)
+    q=sp.add_parser("delete-if-failed"); q.add_argument("session"); q.set_defaults(func=cmd_session_delete_if_failed)
     q=sp.add_parser("wait"); q.add_argument("session"); q.add_argument("--timeout", type=int, default=900); q.add_argument("--interval", type=int, default=10); q.add_argument("--logs", action="store_true"); q.add_argument("--log-lines", type=int, default=5); q.add_argument("--verbose", action="store_true"); q.set_defaults(func=cmd_session_wait)
 
     p=sub.add_parser("job"); sp=p.add_subparsers(dest="job_cmd", required=True)

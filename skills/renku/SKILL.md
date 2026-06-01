@@ -299,8 +299,34 @@ Non-interactive job launcher body example (uses a pre-built image):
 ```
 
 For any launcher using a custom image (`environment_kind: "CUSTOM"`):
-- The `environment` object requires a `"name"` field — omitting it returns HTTP 422.
+- The `environment` object requires both `"name"` and `"description"` fields — omitting `"name"` returns HTTP 422.
 - Both `working_directory` and `mount_directory` must be set; use `/home/renku/work` for both on Renku-built images.
+- For CNB/Renku-built images, use `"command": ["/cnb/lifecycle/launcher"]`.
+- The known-good full environment shape for a custom-image launcher:
+
+```json
+{
+  "project_id": "...",
+  "name": "My launcher",
+  "resource_class_id": <resource-class-id>,
+  "environment": {
+    "name": "My launcher",
+    "description": "Short description",
+    "environment_image_source": "image",
+    "environment_kind": "CUSTOM",
+    "container_image": "<image>",
+    "working_directory": "/home/renku/work",
+    "mount_directory": "/home/renku/work",
+    "default_url": "/",
+    "port": 8080,
+    "uid": 1000,
+    "gid": 1000,
+    "strip_path_prefix": false,
+    "command": ["/cnb/lifecycle/launcher"],
+    "args": ["bash", "-lc", "<startup command>"]
+  }
+}
+```
 
 **Repository checkout path in sessions and jobs.** Renku always clones the linked repository to `{mount_directory}/{repo-slug}/` at session/job start — it does not use `working_directory` as the checkout root. Keep `working_directory == mount_directory == /home/renku/work` to avoid a double-nested path like `/home/renku/work/my-repo/my-repo/`. Reference scripts and notebooks by their full path:
 
@@ -310,6 +336,62 @@ For any launcher using a custom image (`environment_kind: "CUSTOM"`):
 ```
 
 Data connectors are mounted at `/home/renku/work/<target_path>/`, alongside the repository checkout.
+
+#### Custom frontend launcher templates
+
+For frontend-specific session commands, port binding, and base-URL path handling, consult the official Renku docs:
+<https://docs.renkulab.io/en/latest/docs/users/sessions/guides/environments/use-your-own-docker-image-for-renku-session/#example-image-configurations>
+
+Tested `args` for common frontends (CNB/Renku-built images, port 8080). Use these as the `args` array with `"command": ["/cnb/lifecycle/launcher"]`.
+
+**Streamlit:**
+
+```json
+["bash", "-lc", "streamlit run /home/renku/work/<repo-slug>/<app>.py --server.address 0.0.0.0 --server.port 8080 --server.headless true --server.enableCORS false --server.enableXsrfProtection false --server.baseUrlPath ${RENKU_BASE_URL_PATH#/}"]
+```
+
+**Gradio** (app must accept `--server_port`, `--server_name`, `--root_path` args and pass them to `launch()`):
+
+```json
+["bash", "-lc", "python /home/renku/work/<repo-slug>/<app>.py --server_port=8080 --server_name=0.0.0.0 --root_path=$RENKU_BASE_URL_PATH"]
+```
+
+**Plotly Dash:**
+
+```json
+["bash", "-lc", "python /home/renku/work/<repo-slug>/<app>.py"]
+```
+
+Notes:
+- Always bind to `0.0.0.0`, never `localhost` or `127.0.0.1`.
+- Use port `8080` consistently and set `"port": 8080` in the launcher environment.
+- `$RENKU_BASE_URL_PATH` is a runtime environment variable — it must NOT be expanded when the JSON payload is written. See "Shell variable expansion" warning below.
+- For debugging a crashing app launcher, prefix the startup command with `export PYTHONUNBUFFERED=1;` to ensure Python output appears in logs immediately.
+
+#### Shell variable expansion in JSON payloads
+
+`$RENKU_BASE_URL_PATH`, `${RENKU_BASE_URL_PATH#/}`, `$RENKU_WORKING_DIR`, and similar variables must reach the container as literal strings — they are expanded at container runtime by the session's shell, not at payload-creation time.
+
+**Do not** write JSON payloads using unquoted shell heredocs or string interpolation:
+
+```bash
+# WRONG — shell expands $RENKU_BASE_URL_PATH to empty string at heredoc creation time
+cat <<JSON > patch.json
+{"args": ["bash", "-lc", "streamlit run app.py --baseUrlPath $RENKU_BASE_URL_PATH"]}
+JSON
+```
+
+**Do** use single-quoted heredocs or Python `json.dumps`:
+
+```bash
+# Correct — single quotes prevent shell expansion
+cat <<'JSON' > patch.json
+{"args": ["bash", "-lc", "streamlit run app.py --server.baseUrlPath ${RENKU_BASE_URL_PATH#/}"]}
+JSON
+
+# Also correct — Python handles quoting, no shell interpolation
+python3 -c "import json; print(json.dumps({'args': ['bash', '-lc', 'streamlit run app.py --server.baseUrlPath \${RENKU_BASE_URL_PATH#/}']}))"
+```
 
 Known build variants/frontends:
 
@@ -324,6 +406,8 @@ python3 scripts/renku_agent.py launcher list
 python3 scripts/renku_agent.py launcher project-list --project <project-id>
 python3 scripts/renku_agent.py launcher get <launcher-id>
 python3 scripts/renku_agent.py launcher create --payload '{"project_id":"01...","name":"...","environment":{...}}'
+python3 scripts/renku_agent.py launcher create --payload '...' --resource-class-id <id>   # set/override resource class
+python3 scripts/renku_agent.py launcher patch <launcher-id> --resource-class-id <id>      # patch resource class only
 python3 scripts/renku_agent.py launcher patch <launcher-id> --payload '{"name":"new name"}'
 python3 scripts/renku_agent.py launcher delete <launcher-id>
 
@@ -366,6 +450,7 @@ python3 scripts/renku_agent.py session logs <session-id>
 python3 scripts/renku_agent.py session wait <session-id> --logs
 python3 scripts/renku_agent.py job wait <job-session-id>
 python3 scripts/renku_agent.py session delete <session-id>
+python3 scripts/renku_agent.py session delete-if-failed <session-id>   # safe: only deletes if failed/error/stopped
 ```
 
 When presenting a URL to the user, prefer the Renku project iframe URL rather than the raw backend session URL. If the project namespace/slug and session name are known, construct:
