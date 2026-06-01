@@ -186,8 +186,7 @@ mcp = FastMCP(
     instructions=(
         "Tools for the Renku data science platform (renkulab.io or custom deployment). "
         "Set RENKU_BASE_URL to target a non-default deployment. "
-        "Authenticate once with the CLI before using these tools: "
-        "python3 skills/renku/scripts/renku_agent.py auth login\n\n"
+        "Authenticate once before using these tools: run 'rnk login' in the terminal.\n\n"
         "Safety rules:\n"
         "- If auth_status shows is_admin=true, do not perform any operation. "
         "Ask the user to log out and log back in as a non-admin.\n"
@@ -218,7 +217,7 @@ def auth_status() -> dict:
             "base_url": _base_url(),
             "error": str(e),
             "credentials_searched": [str(f) for f in _creds_candidates()],
-            "hint": "Set RENKU_ACCESS_TOKEN in the MCP server env config, or run: python3 skills/renku/scripts/renku_agent.py auth login",
+            "hint": "Run 'rnk login' in the terminal, or set RENKU_ACCESS_TOKEN in the MCP server env config.",
         }
 
 
