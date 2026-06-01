@@ -106,6 +106,24 @@ python3 scripts/renku_agent.py connector delete <connector-id>
 
 If unlinking fails with "link to the owner project cannot be removed", the connector is project-owned and should be deleted instead of unlinked.
 
+## Moving a connector to a different namespace
+
+A project-owned connector (one whose `namespace` matches the project's namespace/slug) can be moved to a user or group namespace with a PATCH. This is useful when a connector was accidentally created as project-owned but should be shared across projects.
+
+```bash
+# 1. Confirm current ownership
+python3 scripts/renku_agent.py connector get <connector-id>
+
+# 2. Move to user namespace (replace with actual username)
+python3 scripts/renku_agent.py api PATCH /data_connectors/<connector-id> \
+  --body '{"namespace": "<username>"}'
+
+# 3. Re-link to the project if needed (the ownership transfer may remove the implicit project link)
+python3 scripts/renku_agent.py connector link --connector <connector-id> --project <project-id>
+```
+
+After the PATCH, verify with `connector get` that `namespace` changed and the connector appears in `connector list`. If the project link was lost, re-add it with `connector link`.
+
 ## Session launcher types
 
 Renku session launchers can use different environment sources.

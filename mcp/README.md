@@ -109,6 +109,7 @@ Set them in the `env` block of your MCP config:
 | `connector_create_doi` | Create a global DOI/Zenodo connector |
 | `connector_create_s3` | Create an S3 connector (credentials from env) |
 | `connector_create_polybox` | Create a Polybox/SWITCHdrive connector (password from env) |
+| `connector_patch` | Patch a connector (name, namespace, visibility, storage) |
 | `connector_link` | Link a connector to a project |
 | `connector_unlink` | Unlink a non-owned connector from a project |
 | `connector_delete` | Delete a project-owned connector |

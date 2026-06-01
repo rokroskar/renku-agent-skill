@@ -452,6 +452,22 @@ def connector_link(connector_id: str, project_id: str) -> dict:
 
 
 @mcp.tool()
+def connector_patch(connector_id: str, body: dict) -> dict:
+    """Patch a data connector (name, namespace, visibility, storage fields, etc.).
+
+    To move a project-owned connector to a user namespace:
+      1. Call connector_get to confirm current namespace and note any project_links.
+      2. Call connector_patch(connector_id, {"namespace": "<your-username>"}).
+      3. The connector is now user-owned. Re-link it to the project with connector_link if needed.
+
+    Args:
+        connector_id: Connector ID.
+        body: Partial update body (only included fields are changed).
+    """
+    return _api("PATCH", f"/data_connectors/{connector_id}", body)
+
+
+@mcp.tool()
 def connector_unlink(connector_id: str, link_id: str) -> str:
     """Unlink a non-owned data connector from a project. Use connector_delete for owned connectors."""
     _api("DELETE", f"/data_connectors/{connector_id}/project_links/{link_id}")
