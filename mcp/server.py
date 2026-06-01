@@ -449,13 +449,13 @@ def connector_create_polybox(
 @mcp.tool()
 def connector_link(connector_id: str, project_id: str) -> dict:
     """Link a data connector to a project."""
-    return _api("POST", f"/data_connectors/{connector_id}/projects", {"project_id": project_id})
+    return _api("POST", f"/data_connectors/{connector_id}/project_links", {"project_id": project_id})
 
 
 @mcp.tool()
 def connector_unlink(connector_id: str, link_id: str) -> str:
     """Unlink a non-owned data connector from a project. Use connector_delete for owned connectors."""
-    _api("DELETE", f"/data_connectors/{connector_id}/projects/{link_id}")
+    _api("DELETE", f"/data_connectors/{connector_id}/project_links/{link_id}")
     return f"Unlinked connector {connector_id} (link {link_id})"
 
 
