@@ -106,6 +106,57 @@ Claude Code auto-discovers changes without restarting. Invoke with `/renku`, or 
 
 The skill uses `${CLAUDE_SKILL_DIR}` to locate its helper script, so it works correctly regardless of the current working directory.
 
+### MCP server (Claude Code / Claude Desktop)
+
+The `mcp/` directory contains a FastMCP server that exposes every Renku operation as a typed tool. This is an alternative to the skill for MCP-compatible clients; typed schemas prevent whole classes of argument errors that the text-based skill cannot catch.
+
+**Install:**
+
+```bash
+pip install fastmcp
+```
+
+**Authenticate once** (shared credential store with the skill):
+
+```bash
+python3 skills/renku/scripts/renku_agent.py auth login
+```
+
+**Register in Claude Code** (`~/.claude/settings.json` for global, or `.claude/settings.json` for project-local):
+
+```json
+{
+  "mcpServers": {
+    "renku": {
+      "command": "python3",
+      "args": ["/path/to/renku-agent-skill/mcp/server.py"],
+      "env": {
+        "RENKU_BASE_URL": "https://renkulab.io"
+      }
+    }
+  }
+}
+```
+
+For a non-default deployment, set `RENKU_BASE_URL`. For connectors requiring credentials, add them to `env` — they stay in your local config and never appear in Claude conversations:
+
+```json
+"env": {
+  "RENKU_BASE_URL": "https://dev.renku.ch",
+  "RENKU_S3_ACCESS_KEY_ID": "...",
+  "RENKU_S3_SECRET_ACCESS_KEY": "...",
+  "RENKU_CONNECTOR_PASSWORD": "..."
+}
+```
+
+**Update:**
+
+```bash
+git -C /path/to/renku-agent-skill pull
+```
+
+The server restarts automatically when Claude Code reloads its MCP config.
+
 ### Codex CLI
 
 Codex uses `AGENTS.md` files for persistent instructions. Clone the package somewhere stable, then add a short instruction file that tells Codex where the skill lives.
