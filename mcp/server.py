@@ -37,33 +37,41 @@ except ImportError:
 # HTTP / auth layer  (stdlib only, same pattern as renku_agent.py)
 # ---------------------------------------------------------------------------
 
-_CONFIG_CANDIDATES = [
-    Path(os.environ["RENKU_CONFIG_DIR"]) if os.environ.get("RENKU_CONFIG_DIR") else None,
-    Path.home() / ".config" / "renku-agent-skill",
-    Path(".pi") / "renku-config",
-]
-
-
 def _base_url() -> str:
     return os.environ.get("RENKU_BASE_URL", "https://renkulab.io").rstrip("/")
+
+
+def _creds_candidates() -> list[Path]:
+    candidates = []
+    if d := os.environ.get("RENKU_CONFIG_DIR"):
+        candidates.append(Path(d) / "credentials.json")
+    home = Path.home()
+    candidates += [
+        home / ".config" / "renku-agent-skill" / "credentials.json",
+        home / ".pi" / "renku-config" / "credentials.json",
+    ]
+    return candidates
 
 
 def _token() -> str:
     for var in ("RENKU_ACCESS_TOKEN", "RENKU_TOKEN", "RENKU_CLI_ACCESS_TOKEN"):
         if t := os.environ.get(var):
             return t
-    for d in _CONFIG_CANDIDATES:
-        if d:
-            f = d / "credentials.json"
-            if f.exists():
-                try:
-                    entry = json.loads(f.read_text()).get(_base_url(), {})
-                    if t := entry.get("access_token") or entry.get("token"):
-                        return t
-                except Exception:
-                    pass
+    checked: list[str] = []
+    for f in _creds_candidates():
+        checked.append(str(f))
+        if f.exists():
+            try:
+                entry = json.loads(f.read_text()).get(_base_url(), {})
+                if t := entry.get("access_token") or entry.get("token"):
+                    return t
+            except Exception:
+                pass
     raise RuntimeError(
-        "Not authenticated. Run: python3 skills/renku/scripts/renku_agent.py auth login"
+        f"Not authenticated for {_base_url()}. "
+        f"Run: python3 skills/renku/scripts/renku_agent.py auth login\n"
+        f"Credentials searched in: {', '.join(checked)}\n"
+        f"Or set RENKU_ACCESS_TOKEN in the MCP server environment."
     )
 
 
@@ -151,9 +159,20 @@ mcp = FastMCP(
 @mcp.tool()
 def auth_status() -> dict:
     """Return current authentication status, user info, and target deployment URL.
-    Always check this first; refuse all operations if is_admin is true."""
-    user = _api("GET", "/user")
-    return {"base_url": _base_url(), "user": user, "is_admin": user.get("is_admin", False)}
+    Always check this first; refuse all operations if is_admin is true.
+    If not authenticated, the response includes the paths that were searched
+    so the user knows where to look or which env var to set."""
+    try:
+        user = _api("GET", "/user")
+        return {"authenticated": True, "base_url": _base_url(), "user": user, "is_admin": user.get("is_admin", False)}
+    except RuntimeError as e:
+        return {
+            "authenticated": False,
+            "base_url": _base_url(),
+            "error": str(e),
+            "credentials_searched": [str(f) for f in _creds_candidates()],
+            "hint": "Set RENKU_ACCESS_TOKEN in the MCP server env config, or run: python3 skills/renku/scripts/renku_agent.py auth login",
+        }
 
 
 @mcp.tool()
