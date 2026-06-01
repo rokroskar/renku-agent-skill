@@ -116,10 +116,10 @@ The `mcp/` directory contains a FastMCP server that exposes every Renku operatio
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-**Authenticate once** (shared credential store with the skill):
+**Authenticate once** with the official Renku CLI:
 
 ```bash
-python3 skills/renku/scripts/renku_agent.py auth login
+rnk login
 ```
 
 **Register in Claude Code** using `claude mcp add` (stores in `~/.claude.json`, available in all sessions):

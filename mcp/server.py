@@ -7,11 +7,12 @@
 Renku MCP server.
 
 Exposes Renku platform operations as typed MCP tools.
-Authenticate first with the CLI helper:
+Authenticate with the official Renku CLI:
 
-    python3 skills/renku/scripts/renku_agent.py auth login
+    rnk login
 
-Claude Code starts this server automatically via the MCP config (see README).
+The server reads rnk's token file automatically. Claude Code starts this
+server automatically via the MCP config (see README).
 uv handles the fastmcp dependency — no manual pip install needed.
 """
 
@@ -53,6 +54,48 @@ def _creds_candidates() -> list[Path]:
     return candidates
 
 
+def _rnk_token_paths() -> list[Path]:
+    """Paths where the official rnk CLI stores its token file."""
+    home = Path.home()
+    paths = []
+    if sys.platform == "darwin":
+        paths.append(home / "Library" / "Application Support" / "io.renku.sdsc.renku-cli" / "token.json")
+    xdg = Path(os.environ.get("XDG_DATA_HOME", home / ".local" / "share"))
+    paths.append(xdg / "io.renku.sdsc.renku-cli" / "token.json")
+    if appdata := os.environ.get("APPDATA"):
+        paths.append(Path(appdata) / "io.renku.sdsc.renku-cli" / "token.json")
+    return paths
+
+
+def _load_rnk_token() -> str | None:
+    """Read an access token from the rnk CLI token file, validating issuer and expiry."""
+    import base64
+    expected_issuer = _base_url() + "/auth/realms/Renku"
+    for path in _rnk_token_paths():
+        if not path.exists():
+            continue
+        try:
+            data = json.loads(path.read_text())
+            response = data.get("response") or data
+            access = response.get("access_token")
+            if not access:
+                continue
+            try:
+                payload_part = access.split(".")[1]
+                payload_part += "=" * (-len(payload_part) % 4)
+                payload = json.loads(base64.urlsafe_b64decode(payload_part.encode()))
+                if payload.get("iss") != expected_issuer:
+                    continue
+                if payload.get("exp") and time.time() > int(payload["exp"]) - 60:
+                    continue
+            except Exception:
+                pass  # accept token even if JWT decode fails
+            return access
+        except Exception:
+            continue
+    return None
+
+
 def _token() -> str:
     for var in ("RENKU_ACCESS_TOKEN", "RENKU_TOKEN", "RENKU_CLI_ACCESS_TOKEN"):
         if t := os.environ.get(var):
@@ -67,11 +110,15 @@ def _token() -> str:
                     return t
             except Exception:
                 pass
+    if t := _load_rnk_token():
+        return t
+    rnk_paths = [str(p) for p in _rnk_token_paths()]
     raise RuntimeError(
-        f"Not authenticated for {_base_url()}. "
-        f"Run: python3 skills/renku/scripts/renku_agent.py auth login\n"
+        f"Not authenticated for {_base_url()}.\n"
+        f"Run: rnk login\n"
         f"Credentials searched in: {', '.join(checked)}\n"
-        f"Or set RENKU_ACCESS_TOKEN in the MCP server environment."
+        f"rnk token paths searched: {', '.join(rnk_paths)}\n"
+        f"Or set RENKU_ACCESS_TOKEN in the MCP server environment config."
     )
 
 

@@ -23,19 +23,19 @@ Python 3.11+ required (uv will download it if needed).
 
 ## Authentication
 
-The MCP server reads the same credential file as the CLI helper. Authenticate once with the CLI:
+Authenticate once with the official Renku CLI:
 
 ```bash
-python3 skills/renku/scripts/renku_agent.py auth login
+rnk login
 ```
 
-Credentials are stored in `~/.config/renku-agent-skill/credentials.json` and reused by the server. You do not need to restart the server after logging in — it reads the file on each request.
-
-Alternatively, pass a token directly via environment variable:
+The server reads the `rnk` token file automatically — no separate login step needed. It also accepts a token via environment variable if you prefer:
 
 ```bash
-RENKU_ACCESS_TOKEN=<token> python3 mcp/server.py
+RENKU_ACCESS_TOKEN=<token> uv run mcp/server.py
 ```
+
+The token is never passed as a tool parameter and never appears in the conversation.
 
 ## Running the server
 
