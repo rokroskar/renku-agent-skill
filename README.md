@@ -110,10 +110,10 @@ The skill uses `${CLAUDE_SKILL_DIR}` to locate its helper script, so it works co
 
 The `mcp/` directory contains a FastMCP server that exposes every Renku operation as a typed tool. This is an alternative to the skill for MCP-compatible clients; typed schemas prevent whole classes of argument errors that the text-based skill cannot catch.
 
-**Install:**
+**Install [uv](https://docs.astral.sh/uv/)** (manages the `fastmcp` dependency automatically — no pip install needed):
 
 ```bash
-pip install fastmcp
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 **Authenticate once** (shared credential store with the skill):
@@ -122,23 +122,20 @@ pip install fastmcp
 python3 skills/renku/scripts/renku_agent.py auth login
 ```
 
-**Register in Claude Code** (`~/.claude/settings.json` for global, or `.claude/settings.json` for project-local):
+**Register in Claude Code** (`~/.claude/settings.json` for global, or `.claude/settings.json` for project-local). Claude starts the server automatically:
 
 ```json
 {
   "mcpServers": {
     "renku": {
-      "command": "python3",
-      "args": ["/path/to/renku-agent-skill/mcp/server.py"],
-      "env": {
-        "RENKU_BASE_URL": "https://renkulab.io"
-      }
+      "command": "uv",
+      "args": ["run", "/path/to/renku-agent-skill/mcp/server.py"]
     }
   }
 }
 ```
 
-For a non-default deployment, set `RENKU_BASE_URL`. For connectors requiring credentials, add them to `env` — they stay in your local config and never appear in Claude conversations:
+For a non-default deployment, or to pass connector credentials (they stay in local config, never in conversations):
 
 ```json
 "env": {

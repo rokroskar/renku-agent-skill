@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["fastmcp>=2.0"]
+# ///
 """
 Renku MCP server.
 
@@ -7,12 +11,8 @@ Authenticate first with the CLI helper:
 
     python3 skills/renku/scripts/renku_agent.py auth login
 
-Then start the server:
-
-    pip install fastmcp
-    python3 mcp/server.py
-
-Or register it in Claude Code's MCP config (see README).
+Claude Code starts this server automatically via the MCP config (see README).
+uv handles the fastmcp dependency — no manual pip install needed.
 """
 
 from __future__ import annotations

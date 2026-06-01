@@ -12,11 +12,14 @@ The skill works in any agent (Pi, Codex, OpenCode, Claude Code) but relies on th
 
 ## Prerequisites
 
+[uv](https://docs.astral.sh/uv/) must be installed. `uv` reads the dependency declaration embedded in `server.py` and manages the virtualenv automatically — no manual `pip install` needed.
+
 ```bash
-pip install fastmcp
+# Install uv if not already present
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-Python 3.11+ required.
+Python 3.11+ required (uv will download it if needed).
 
 ## Authentication
 
@@ -36,11 +39,11 @@ RENKU_ACCESS_TOKEN=<token> python3 mcp/server.py
 
 ## Running the server
 
-```bash
-python3 mcp/server.py
-```
+Claude Code starts the server automatically — you don't run it manually. For testing:
 
-The server runs in stdio mode by default (suitable for Claude Code MCP config).
+```bash
+uv run mcp/server.py
+```
 
 ## Claude Code integration
 
@@ -50,8 +53,8 @@ Add to `~/.claude/settings.json` (global) or `.claude/settings.json` (project-lo
 {
   "mcpServers": {
     "renku": {
-      "command": "python3",
-      "args": ["/absolute/path/to/renku-agent-skill/mcp/server.py"]
+      "command": "uv",
+      "args": ["run", "/absolute/path/to/renku-agent-skill/mcp/server.py"]
     }
   }
 }
@@ -63,8 +66,8 @@ For a non-default Renku deployment, add `RENKU_BASE_URL` to `env`:
 {
   "mcpServers": {
     "renku": {
-      "command": "python3",
-      "args": ["/absolute/path/to/renku-agent-skill/mcp/server.py"],
+      "command": "uv",
+      "args": ["run", "/absolute/path/to/renku-agent-skill/mcp/server.py"],
       "env": {
         "RENKU_BASE_URL": "https://dev.renku.ch"
       }
@@ -81,7 +84,7 @@ Set them in the `env` block of your MCP config:
 
 ```json
 "env": {
-  "RENKU_BASE_URL": "https://renkulab.io",
+  "RENKU_BASE_URL": "https://dev.renku.ch",
   "RENKU_S3_ACCESS_KEY_ID": "your-key-id",
   "RENKU_S3_SECRET_ACCESS_KEY": "your-secret-key",
   "RENKU_CONNECTOR_PASSWORD": "your-polybox-password"
