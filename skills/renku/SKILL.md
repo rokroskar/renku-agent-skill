@@ -6,6 +6,8 @@ allowed-tools: Bash(python3 *)
 
 # Renku
 
+**If MCP tools named `mcp__renku__*` are available in your tool list, use those instead of this skill.** They provide typed schemas, keep credentials server-side, and return structured data. Only fall back to this skill when no MCP tools are present.
+
 Use this skill when the user asks to work with the Renku platform, especially `https://renkulab.io` or `https://dev.renku.ch`.
 
 The skill is workflow-first. Prefer high-level commands in `scripts/renku_agent.py`; use the generic API escape hatch only when no workflow command exists.
