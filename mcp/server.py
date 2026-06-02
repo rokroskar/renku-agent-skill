@@ -155,6 +155,19 @@ def _api(
         raise RuntimeError(f"HTTP {e.code}: {e.read().decode()}")
 
 
+def _is_stale_session(s: dict) -> bool:
+    """True if a session has a will_delete_at timestamp already in the past."""
+    import datetime
+    wda = s.get("will_delete_at")
+    if not wda:
+        return False
+    try:
+        ts = datetime.datetime.fromisoformat(wda.replace("Z", "+00:00")).timestamp()
+        return ts < time.time()
+    except Exception:
+        return False
+
+
 def _project_path(ident: str) -> str:
     if "/" in ident:
         ns, slug = ident.split("/", 1)
@@ -595,9 +608,20 @@ def session_launch(
 
 
 @mcp.tool()
-def session_list(session_type: str = "interactive") -> list[dict]:
-    """List sessions. session_type: 'interactive' or 'non-interactive'."""
-    return _api("GET", "/sessions", query={"session_type": session_type})
+def session_list(session_type: str = "interactive", project_id: str = "") -> list[dict]:
+    """List sessions, excluding stale hibernated records.
+
+    Args:
+        session_type: 'interactive' or 'non-interactive'.
+        project_id: Optional project ID to scope results to one project.
+    """
+    query: dict[str, Any] = {"session_type": session_type}
+    if project_id:
+        query["project_id"] = project_id
+    sessions = _api("GET", "/sessions", query=query)
+    if not isinstance(sessions, list):
+        return sessions
+    return [s for s in sessions if not _is_stale_session(s)]
 
 
 @mcp.tool()
@@ -687,9 +711,19 @@ def job_run(
 
 
 @mcp.tool()
-def job_list() -> list[dict]:
-    """List non-interactive job sessions."""
-    return _api("GET", "/sessions", query={"session_type": "non-interactive"})
+def job_list(project_id: str = "") -> list[dict]:
+    """List non-interactive job sessions, excluding stale hibernated records.
+
+    Args:
+        project_id: Optional project ID to scope results to one project.
+    """
+    query: dict[str, Any] = {"session_type": "non-interactive"}
+    if project_id:
+        query["project_id"] = project_id
+    sessions = _api("GET", "/sessions", query=query)
+    if not isinstance(sessions, list):
+        return sessions
+    return [s for s in sessions if not _is_stale_session(s)]
 
 
 @mcp.tool()
