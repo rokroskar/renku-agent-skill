@@ -794,10 +794,38 @@ def job_list(project_id: str = "") -> list[dict]:
 
 
 @mcp.tool()
+def job_poll(session_id: str) -> dict:
+    """Get the current state and recent log tail for a job in one call.
+
+    Use this in a manual polling loop when you want to report progress to the user
+    during a long-running job. Call every 15-30 seconds and report the log tail
+    until state is in a terminated set (succeeded/completed/finished/failed/error/stopped).
+
+    Returns: {state, session, logs} where logs is container_name -> log_text.
+    """
+    session = _api("GET", f"/sessions/{session_id}")
+    status = session.get("status") or {}
+    state = status.get("state") or session.get("state") or "unknown"
+    result: dict[str, Any] = {"state": state, "session": session}
+    try:
+        logs = _api("GET", f"/sessions/{session_id}/logs")
+        if isinstance(logs, dict):
+            result["logs"] = dict(
+                sorted(logs.items(), key=lambda kv: (kv[0] != "amalthea-session", kv[0]))
+            )
+        else:
+            result["logs"] = logs
+    except Exception:
+        pass
+    return result
+
+
+@mcp.tool()
 def job_wait(session_id: str, timeout: int = 1800, interval: int = 15) -> dict:
     """Wait for a non-interactive job to reach a terminated state.
-    Returns final state dict; includes all container logs on failure
-    with amalthea-session (main app container) first.
+    Polls both session status and logs at each interval.
+    Always returns logs with the final result (success, failure, or timeout).
+    amalthea-session container (main app) is listed first in logs.
 
     Args:
         session_id: Session name or ID.
@@ -807,22 +835,29 @@ def job_wait(session_id: str, timeout: int = 1800, interval: int = 15) -> dict:
     terminated = {"succeeded", "completed", "finished", "failed", "error", "stopped"}
     success = {"succeeded", "completed", "finished"}
     end = time.time() + timeout
+    latest_logs: Any = None
     while time.time() < end:
         session = _api("GET", f"/sessions/{session_id}")
         status = session.get("status") or {}
         state = status.get("state") or session.get("state") or "unknown"
+        try:
+            logs = _api("GET", f"/sessions/{session_id}/logs")
+            if isinstance(logs, dict):
+                latest_logs = dict(
+                    sorted(logs.items(), key=lambda kv: (kv[0] != "amalthea-session", kv[0]))
+                )
+            else:
+                latest_logs = logs
+        except Exception:
+            pass
         if state in terminated:
             result: dict[str, Any] = {"state": state, "session": session}
-            if state not in success:
+            if latest_logs is not None:
+                result["logs"] = latest_logs
+            if state not in success and latest_logs is None:
+                # last-chance log fetch if polling never succeeded
                 try:
-                    logs = _api("GET", f"/sessions/{session_id}/logs")
-                    if isinstance(logs, dict):
-                        ordered = dict(
-                            sorted(logs.items(), key=lambda kv: (kv[0] != "amalthea-session", kv[0]))
-                        )
-                        result["logs"] = ordered
-                    else:
-                        result["logs"] = logs
+                    result["logs"] = _api("GET", f"/sessions/{session_id}/logs")
                 except Exception:
                     pass
             return result
@@ -830,7 +865,10 @@ def job_wait(session_id: str, timeout: int = 1800, interval: int = 15) -> dict:
     session = _api("GET", f"/sessions/{session_id}")
     status = session.get("status") or {}
     state = status.get("state") or session.get("state") or "unknown"
-    return {"state": state, "timed_out": True, "session": session}
+    result = {"state": state, "timed_out": True, "session": session}
+    if latest_logs is not None:
+        result["logs"] = latest_logs
+    return result
 
 
 # -- Builds ------------------------------------------------------------------

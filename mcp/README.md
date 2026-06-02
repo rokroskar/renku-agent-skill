@@ -129,7 +129,8 @@ Set them in the `env` block of your MCP config:
 | `session_wait` | Wait for a session to reach running state |
 | `job_run` | Launch a non-interactive job |
 | `job_list` | List non-interactive jobs |
-| `job_wait` | Wait for a job to complete (returns logs on failure) |
+| `job_poll` | Get current state + log tail in one call (use for manual progress loops) |
+| `job_wait` | Wait for a job to complete, polling logs throughout; always returns logs |
 | `build_list` | List builds for an environment |
 | `build_get` | Get build status |
 | `build_logs` | Get build logs |
