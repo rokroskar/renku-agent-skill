@@ -207,6 +207,11 @@ mcp = FastMCP(
         "Pick a matching=true class appropriate for the task and pass its id.\n"
         "- Always pass project_id to connector_create_* tools so the connector is linked immediately. "
         "A connector created without project_id is orphaned — not visible in the project.\n"
+        "- Before job_run: call job_list(project_id=...) and delete any existing terminal session "
+        "for the same launcher with session_delete_if_terminal. job_run will error if a non-terminal "
+        "session already exists.\n"
+        "- If job_wait returns timed_out=true, call job_list to get actual state before deciding next steps. "
+        "Do not assume the job is still running.\n"
         "- Confirm with the user before deleting connectors, launchers, or running sessions.\n"
         "- Credentials for S3/Polybox are read from server-side environment variables — "
         "never ask the user to pass them as tool parameters."
@@ -676,9 +681,23 @@ def session_delete(session_id: str) -> str:
 
 
 @mcp.tool()
+def session_delete_if_terminal(session_id: str) -> str:
+    """Delete a session if it is in any terminal state (failed, error, stopped, succeeded, completed, finished).
+    Safe no-op if still running or starting. Use before relaunching to clear the slot."""
+    session = _api("GET", f"/sessions/{session_id}")
+    status = session.get("status") or {}
+    state = status.get("state") or session.get("state") or "unknown"
+    terminal = {"failed", "error", "stopped", "succeeded", "completed", "finished"}
+    if state not in terminal:
+        return f"Session {session_id} is in state '{state}' — not deleted."
+    _api("DELETE", f"/sessions/{session_id}")
+    return f"Deleted session {session_id} (was {state})"
+
+
+@mcp.tool()
 def session_delete_if_failed(session_id: str) -> str:
     """Delete a session only if it is in a failed/error/stopped state. Safe no-op otherwise.
-    Use this before relaunching from the same launcher to avoid session name conflicts."""
+    For job reruns use session_delete_if_terminal instead — it also clears succeeded sessions."""
     session = _api("GET", f"/sessions/{session_id}")
     status = session.get("status") or {}
     state = status.get("state") or session.get("state") or "unknown"
@@ -728,17 +747,34 @@ def job_run(
 ) -> dict:
     """Launch a non-interactive job from a launcher.
 
+    Raises an error if a non-terminal session for this launcher already exists —
+    call session_delete_if_terminal on it first, then retry.
+    The response includes _created: true to confirm a fresh session was started.
+
     Args:
         launcher_id: Launcher ID.
         resource_class_id: Override resource class for this run only.
         disk_storage: Override disk storage in GB.
     """
+    non_terminal = {"running", "starting", "stopping", "hibernating", "hibernated", "pending"}
+    existing = _api("GET", "/sessions", query={"session_type": "non-interactive"})
+    if isinstance(existing, list):
+        for s in existing:
+            if s.get("launcher_id") == launcher_id:
+                state = (s.get("status") or {}).get("state") or s.get("state") or "unknown"
+                if state in non_terminal:
+                    raise RuntimeError(
+                        f"Session {s.get('name') or s.get('id')} for launcher {launcher_id} "
+                        f"is already in state '{state}'. Call session_delete_if_terminal on it first."
+                    )
     body: dict[str, Any] = {"launcher_id": launcher_id, "session_type": "non-interactive"}
     if resource_class_id is not None:
         body["resource_class_id"] = resource_class_id
     if disk_storage is not None:
         body["disk_storage"] = disk_storage
-    return _api("POST", "/sessions", body)
+    data = _api("POST", "/sessions", body)
+    data["_created"] = True
+    return data
 
 
 @mcp.tool()
@@ -791,7 +827,10 @@ def job_wait(session_id: str, timeout: int = 1800, interval: int = 15) -> dict:
                     pass
             return result
         time.sleep(interval)
-    raise RuntimeError(f"Timed out waiting for job {session_id}")
+    session = _api("GET", f"/sessions/{session_id}")
+    status = session.get("status") or {}
+    state = status.get("state") or session.get("state") or "unknown"
+    return {"state": state, "timed_out": True, "session": session}
 
 
 # -- Builds ------------------------------------------------------------------
