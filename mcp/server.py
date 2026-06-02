@@ -299,6 +299,18 @@ def project_create(
 
 
 @mcp.tool()
+def project_delete(project: str) -> str:
+    """Delete a Renku project. Irreversible — confirm with the user before calling.
+
+    Args:
+        project: Project ID or namespace/slug.
+    """
+    proj = _api("GET", _project_path(project))
+    _api("DELETE", f"/projects/{proj['id']}")
+    return f"Deleted project {proj['id']} ({proj.get('name', '')})"
+
+
+@mcp.tool()
 def project_repo_add(project: str, repository_url: str) -> dict:
     """Add a Git repository URL to a project's repositories list.
 

@@ -103,6 +103,7 @@ Set them in the `env` block of your MCP config:
 | `project_list` | List projects |
 | `project_get` | Get a project by ID or namespace/slug |
 | `project_create` | Create a project |
+| `project_delete` | Delete a project (irreversible) |
 | `project_repo_add` | Add a Git repository to a project |
 | `connector_list` | List data connectors |
 | `connector_get` | Get a connector by ID |
