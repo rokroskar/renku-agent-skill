@@ -207,8 +207,8 @@ mcp = FastMCP(
         "Pick a matching=true class appropriate for the task and pass its id.\n"
         "- Always pass project_id to connector_create_* tools so the connector is linked immediately. "
         "A connector created without project_id is orphaned — not visible in the project.\n"
-        "- Before job_run: call job_list(project_id=...) and delete any existing terminal session "
-        "for the same launcher with session_delete_if_terminal. job_run will error if a non-terminal "
+        "- Before job_run: call job_list(project_id=...) and delete any existing terminated session "
+        "for the same launcher with session_delete_if_terminated. job_run will error if a non-terminated "
         "session already exists.\n"
         "- If job_wait returns timed_out=true, call job_list to get actual state before deciding next steps. "
         "Do not assume the job is still running.\n"
@@ -681,14 +681,14 @@ def session_delete(session_id: str) -> str:
 
 
 @mcp.tool()
-def session_delete_if_terminal(session_id: str) -> str:
-    """Delete a session if it is in any terminal state (failed, error, stopped, succeeded, completed, finished).
+def session_delete_if_terminated(session_id: str) -> str:
+    """Delete a session if it has terminated (failed, error, stopped, succeeded, completed, finished).
     Safe no-op if still running or starting. Use before relaunching to clear the slot."""
     session = _api("GET", f"/sessions/{session_id}")
     status = session.get("status") or {}
     state = status.get("state") or session.get("state") or "unknown"
-    terminal = {"failed", "error", "stopped", "succeeded", "completed", "finished"}
-    if state not in terminal:
+    terminated = {"failed", "error", "stopped", "succeeded", "completed", "finished"}
+    if state not in terminated:
         return f"Session {session_id} is in state '{state}' — not deleted."
     _api("DELETE", f"/sessions/{session_id}")
     return f"Deleted session {session_id} (was {state})"
@@ -697,7 +697,7 @@ def session_delete_if_terminal(session_id: str) -> str:
 @mcp.tool()
 def session_delete_if_failed(session_id: str) -> str:
     """Delete a session only if it is in a failed/error/stopped state. Safe no-op otherwise.
-    For job reruns use session_delete_if_terminal instead — it also clears succeeded sessions."""
+    For job reruns use session_delete_if_terminated instead — it also clears succeeded sessions."""
     session = _api("GET", f"/sessions/{session_id}")
     status = session.get("status") or {}
     state = status.get("state") or session.get("state") or "unknown"
@@ -717,14 +717,14 @@ def session_wait(session_id: str, timeout: int = 900, interval: int = 10) -> dic
         timeout: Maximum wait time in seconds.
         interval: Poll interval in seconds.
     """
-    terminal = {"running", "succeeded", "failed", "error", "stopped"}
+    terminated = {"running", "succeeded", "failed", "error", "stopped"}
     success = {"running", "succeeded"}
     end = time.time() + timeout
     while time.time() < end:
         session = _api("GET", f"/sessions/{session_id}")
         status = session.get("status") or {}
         state = status.get("state") or session.get("state") or "unknown"
-        if state in terminal:
+        if state in terminated:
             result: dict[str, Any] = {"state": state, "session": session}
             if state not in success:
                 try:
@@ -747,8 +747,8 @@ def job_run(
 ) -> dict:
     """Launch a non-interactive job from a launcher.
 
-    Raises an error if a non-terminal session for this launcher already exists —
-    call session_delete_if_terminal on it first, then retry.
+    Raises an error if a non-terminated session for this launcher already exists —
+    call session_delete_if_terminated on it first, then retry.
     The response includes _created: true to confirm a fresh session was started.
 
     Args:
@@ -756,16 +756,16 @@ def job_run(
         resource_class_id: Override resource class for this run only.
         disk_storage: Override disk storage in GB.
     """
-    non_terminal = {"running", "starting", "stopping", "hibernating", "hibernated", "pending"}
+    active = {"running", "starting", "stopping", "hibernating", "hibernated", "pending"}
     existing = _api("GET", "/sessions", query={"session_type": "non-interactive"})
     if isinstance(existing, list):
         for s in existing:
             if s.get("launcher_id") == launcher_id:
                 state = (s.get("status") or {}).get("state") or s.get("state") or "unknown"
-                if state in non_terminal:
+                if state in active:
                     raise RuntimeError(
                         f"Session {s.get('name') or s.get('id')} for launcher {launcher_id} "
-                        f"is already in state '{state}'. Call session_delete_if_terminal on it first."
+                        f"is already in state '{state}'. Call session_delete_if_terminated on it first."
                     )
     body: dict[str, Any] = {"launcher_id": launcher_id, "session_type": "non-interactive"}
     if resource_class_id is not None:
@@ -795,7 +795,7 @@ def job_list(project_id: str = "") -> list[dict]:
 
 @mcp.tool()
 def job_wait(session_id: str, timeout: int = 1800, interval: int = 15) -> dict:
-    """Wait for a non-interactive job to reach a terminal state.
+    """Wait for a non-interactive job to reach a terminated state.
     Returns final state dict; includes all container logs on failure
     with amalthea-session (main app container) first.
 
@@ -804,14 +804,14 @@ def job_wait(session_id: str, timeout: int = 1800, interval: int = 15) -> dict:
         timeout: Maximum wait time in seconds (default 1800).
         interval: Poll interval in seconds.
     """
-    terminal = {"succeeded", "completed", "finished", "failed", "error", "stopped"}
+    terminated = {"succeeded", "completed", "finished", "failed", "error", "stopped"}
     success = {"succeeded", "completed", "finished"}
     end = time.time() + timeout
     while time.time() < end:
         session = _api("GET", f"/sessions/{session_id}")
         status = session.get("status") or {}
         state = status.get("state") or session.get("state") or "unknown"
-        if state in terminal:
+        if state in terminated:
             result: dict[str, Any] = {"state": state, "session": session}
             if state not in success:
                 try:
@@ -864,12 +864,12 @@ def build_wait(build_id: str, timeout: int = 1800, interval: int = 15) -> dict:
         timeout: Maximum wait time in seconds.
         interval: Poll interval in seconds.
     """
-    terminal = {"succeeded", "failed", "error"}
+    terminated = {"succeeded", "failed", "error"}
     end = time.time() + timeout
     while time.time() < end:
         build = _api("GET", f"/builds/{build_id}")
         state = build.get("status", "unknown")
-        if state in terminal:
+        if state in terminated:
             result: dict[str, Any] = {"state": state, "build": build}
             if state != "succeeded":
                 try:

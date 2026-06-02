@@ -124,7 +124,7 @@ Set them in the `env` block of your MCP config:
 | `session_get` | Get session status |
 | `session_logs` | Get session logs (all containers) |
 | `session_delete` | Stop and delete a session |
-| `session_delete_if_terminal` | Delete if in any terminal state (including succeeded) — use before job reruns |
+| `session_delete_if_terminated` | Delete if in any terminated state (including succeeded) — use before job reruns |
 | `session_delete_if_failed` | Delete only if failed/error/stopped — safe no-op otherwise |
 | `session_wait` | Wait for a session to reach running state |
 | `job_run` | Launch a non-interactive job |
