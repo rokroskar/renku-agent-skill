@@ -205,6 +205,8 @@ mcp = FastMCP(
         "Ask the user to log out and log back in as a non-admin.\n"
         "- Always call resource_classes() before creating a launcher or running a job. "
         "Pick a matching=true class appropriate for the task and pass its id.\n"
+        "- Always pass project_id to connector_create_* tools so the connector is linked immediately. "
+        "A connector created without project_id is orphaned — not visible in the project.\n"
         "- Confirm with the user before deleting connectors, launchers, or running sessions.\n"
         "- Credentials for S3/Polybox are read from server-side environment variables — "
         "never ask the user to pass them as tool parameters."
@@ -335,16 +337,17 @@ def connector_get(connector_id: str) -> dict:
 
 
 @mcp.tool()
-def connector_create_doi(doi: str, target_path: str = "") -> dict:
-    """Create a global DOI/Zenodo/Dataverse data connector.
+def connector_create_doi(doi: str, target_path: str = "", project_id: str = "") -> dict:
+    """Create a global DOI/Zenodo/Dataverse data connector and optionally link it to a project.
 
-    target_path is set by Renku from the DOI metadata — do not guess it.
-    Read _mount_path from the returned connector to know where data will appear
-    in sessions (/home/renku/work/<target_path>/).
+    Pass project_id to create and link in one call — recommended to avoid orphaned connectors.
+    target_path is derived from DOI metadata; leave empty unless overriding.
+    Read _mount_path from the response to know where data appears in sessions.
 
     Args:
         doi: DOI string e.g. '10.5281/zenodo.1234567'.
         target_path: Override mount path (leave empty; Renku derives it from metadata).
+        project_id: If set, link the new connector to this project immediately.
     """
     storage: dict[str, Any] = {
         "configuration": {"type": "doi", "doi": doi},
@@ -357,6 +360,8 @@ def connector_create_doi(doi: str, target_path: str = "") -> dict:
     t = (data.get("storage") or {}).get("target_path")
     if t:
         data["_mount_path"] = f"/home/renku/work/{t}"
+    if project_id:
+        data["_link"] = _api("POST", f"/data_connectors/{data['id']}/project_links", {"project_id": project_id})
     return data
 
 
@@ -369,20 +374,23 @@ def connector_create_s3(
     endpoint: str = "",
     provider: str = "Other",
     readonly: bool = True,
+    project_id: str = "",
 ) -> dict:
-    """Create an S3/S3-compatible data connector.
+    """Create an S3/S3-compatible data connector and optionally link it to a project.
 
+    Pass project_id to create and link in one call — recommended to avoid orphaned connectors.
     Credentials are read from RENKU_S3_ACCESS_KEY_ID and RENKU_S3_SECRET_ACCESS_KEY
     environment variables in the MCP server process — never pass them as parameters.
 
     Args:
         name: Connector display name.
-        namespace: Namespace slug (namespace/project-slug or user namespace).
+        namespace: Namespace slug (user namespace recommended so connector can be reused).
         bucket: S3 bucket name.
         target_path: Relative mount path in sessions (e.g. 'data', not '/data').
         endpoint: S3 endpoint URL (empty for AWS S3).
         provider: S3 provider name (default 'Other').
         readonly: Whether the connector is read-only.
+        project_id: If set, link the new connector to this project immediately.
     """
     access_key = os.environ.get("RENKU_S3_ACCESS_KEY_ID")
     secret_key = os.environ.get("RENKU_S3_SECRET_ACCESS_KEY")
@@ -407,7 +415,10 @@ def connector_create_s3(
             "readonly": readonly,
         },
     }
-    return _api("POST", "/data_connectors", body)
+    data = _api("POST", "/data_connectors", body)
+    if project_id:
+        data["_link"] = _api("POST", f"/data_connectors/{data['id']}/project_links", {"project_id": project_id})
+    return data
 
 
 @mcp.tool()
@@ -419,20 +430,23 @@ def connector_create_polybox(
     visibility: str = "public",
     readonly: bool = True,
     kind: str = "polybox",
+    project_id: str = "",
 ) -> dict:
-    """Create a Polybox or SWITCHdrive shared-link data connector.
+    """Create a Polybox or SWITCHdrive shared-link data connector and optionally link it to a project.
 
+    Pass project_id to create and link in one call — recommended to avoid orphaned connectors.
     Password (if required) is read from RENKU_CONNECTOR_PASSWORD in the MCP server
     environment — never pass it as a parameter.
 
     Args:
         name: Connector display name.
-        namespace: Namespace/project-slug.
+        namespace: Namespace slug (user namespace recommended so connector can be reused).
         public_link: Polybox/SWITCHdrive share link URL.
         target_path: Relative mount path (e.g. 'data', not '/data').
         visibility: 'public' or 'private'.
         readonly: Whether the connector is read-only.
         kind: 'polybox' or 'switchdrive'.
+        project_id: If set, link the new connector to this project immediately.
     """
     cfg: dict[str, Any] = {
         "type": "switchDrive" if kind == "switchdrive" else "polybox",
@@ -441,7 +455,7 @@ def connector_create_polybox(
     }
     if pw := os.environ.get("RENKU_CONNECTOR_PASSWORD"):
         cfg["pass"] = pw
-    return _api(
+    data = _api(
         "POST",
         "/data_connectors",
         {
@@ -456,11 +470,16 @@ def connector_create_polybox(
             },
         },
     )
+    if project_id:
+        data["_link"] = _api("POST", f"/data_connectors/{data['id']}/project_links", {"project_id": project_id})
+    return data
 
 
 @mcp.tool()
 def connector_link(connector_id: str, project_id: str) -> dict:
-    """Link a data connector to a project."""
+    """Link an existing data connector to a project.
+    Use this only for connectors that already exist. For new connectors, pass
+    project_id directly to connector_create_* to create and link in one call."""
     return _api("POST", f"/data_connectors/{connector_id}/project_links", {"project_id": project_id})
 
 

@@ -71,6 +71,8 @@ The field is limited to 5000 characters. If a repository README is longer, write
 
 ## Data connector then link to project
 
+**Always link a connector to a project immediately after creating it.** A connector that exists in the system but is not linked to a project is invisible in the project's data tab and will not be mounted in sessions. Never treat creation alone as sufficient.
+
 DOI / Zenodo / Dataverse connectors are global. Create them with the DOI helper, then link the returned connector id to a project:
 
 ```bash
