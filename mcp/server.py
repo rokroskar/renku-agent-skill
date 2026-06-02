@@ -307,12 +307,27 @@ def project_create(
 def project_delete(project: str) -> str:
     """Delete a Renku project. Irreversible — confirm with the user before calling.
 
+    Raises an error if active sessions exist for this project — stop them first
+    with session_delete, then retry.
+
     Args:
         project: Project ID or namespace/slug.
     """
     proj = _api("GET", _project_path(project))
-    _api("DELETE", f"/projects/{proj['id']}")
-    return f"Deleted project {proj['id']} ({proj.get('name', '')})"
+    project_id = proj["id"]
+    active = {"running", "starting", "stopping", "hibernating", "hibernated", "pending"}
+    for session_type in ("interactive", "non-interactive"):
+        sessions = _api("GET", "/sessions", query={"session_type": session_type, "project_id": project_id})
+        if isinstance(sessions, list):
+            blocking = [s for s in sessions if (s.get("status") or {}).get("state", s.get("state")) in active]
+            if blocking:
+                names = [s.get("name") or s.get("id") for s in blocking]
+                raise RuntimeError(
+                    f"Project {project_id} has active {session_type} sessions: {names}. "
+                    f"Stop them with session_delete first."
+                )
+    _api("DELETE", f"/projects/{project_id}")
+    return f"Deleted project {project_id} ({proj.get('name', '')})"
 
 
 @mcp.tool()
